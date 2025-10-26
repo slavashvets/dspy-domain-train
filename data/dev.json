@@ -1,0 +1,54 @@
+[
+  {"history": "", "turn": "I need a taxi to the Hilton Hotel.", "gt": ["taxi"]},
+  {"history": "", "turn": "Book a room near the central station.", "gt": ["hotel"]},
+  {"history": "", "turn": "Find a museum near the station.", "gt": ["attraction"]},
+  {
+    "history": "",
+    "turn": "What's the fastest train to Oxford tomorrow morning?",
+    "gt": ["train"]
+  },
+  {"history": "", "turn": "Bus 42 timetable for Sunday", "gt": ["bus"]},
+  {"history": "", "turn": "Is there an emergency room open now?", "gt": ["hospital"]},
+  {"history": "", "turn": "Call the police, my wallet was stolen.", "gt": ["police"]},
+  {
+    "history": "",
+    "turn": "Reserve at a vegetarian-friendly place downtown.",
+    "gt": ["restaurant"]
+  },
+  {
+    "history": "",
+    "turn": "Cancel my taxi and book a table for 7pm.",
+    "gt": ["taxi", "restaurant"]
+  },
+  {
+    "history": "",
+    "turn": "Cancel the train and switch to a bus.",
+    "gt": ["train", "bus"]
+  },
+  {
+    "history": "Previous turn was about a taxi.",
+    "turn": "Also, does the hotel have a pool?",
+    "gt": ["hotel"]
+  },
+  {
+    "history": "We booked The Grand Hotel.",
+    "turn": "Is breakfast included?",
+    "gt": ["hotel"]
+  },
+  {
+    "history": "We discussed a restaurant booking earlier.",
+    "turn": "Thanks, bye.",
+    "gt": ["none"]
+  },
+  {
+    "history": "We had dinner at the Italian place.",
+    "turn": "The restaurant was too noisy. Anyway, need a cab back.",
+    "gt": ["taxi"]
+  },
+  {"history": "", "turn": "Hi!", "gt": ["none"]},
+  {
+    "history": "",
+    "turn": "Is there a kid-friendly museum near our hotel?",
+    "gt": ["attraction", "hotel"]
+  }
+]

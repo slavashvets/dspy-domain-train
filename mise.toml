@@ -1,0 +1,6 @@
+[tools]
+python = "3.13"
+
+[tasks.dev]
+description = "Run offline SRP once"
+run = "uv run main.py"
