@@ -10,6 +10,8 @@ from typing import Sequence, TypedDict
 import dspy
 from environs import Env
 
+from instrumentation import ConsoleProgress, add_usage, format_usage
+
 DOMAINS: tuple[str, ...] = (
     "restaurant",
     "attraction",
@@ -82,14 +84,22 @@ def configure_lm_from_env() -> None:
     """Configure DSPy with Azure OpenAI settings."""
     env = Env()
     env.read_env()
+    dspy.configure_cache(enable_disk_cache=False, enable_memory_cache=False)
+
+    import logging
+    logging.getLogger("dspy").setLevel(logging.INFO)
+    dspy.settings.configure(track_usage=True)
+
+    progress_cb = ConsoleProgress()
     lm = dspy.LM(
         model=f"azure/{env.str('AZURE_OPENAI_DEPLOYMENT')}",
         model_type="chat",
         api_base=env.str("AZURE_OPENAI_ENDPOINT"),
         api_version=env.str("AZURE_OPENAI_API_VERSION"),
         api_key=env.str("AZURE_OPENAI_API_KEY"),
-        temperature=env.float("AZURE_OPENAI_TEMPERATURE", 1),
-        max_tokens=env.int("AZURE_OPENAI_MAX_TOKENS", 16000),
+        temperature=env.float("AZURE_OPENAI_TEMPERATURE", 0),
+        # max_tokens=env.int("AZURE_OPENAI_MAX_TOKENS", 16000),
+        # callbacks=[progress_cb],
     )
     dspy.configure(lm=lm)
 
@@ -100,9 +110,7 @@ def load_text(path: Path) -> str:
 
 def load_devset(path: Path) -> list[Example]:
     data = json.loads(path.read_text(encoding="utf-8"))
-    return [
-        Example(history=e["history"], turn=e["turn"], gt=e["gt"]) for e in data
-    ]
+    return [Example(history=e["history"], turn=e["turn"], gt=e["gt"]) for e in data]
 
 
 def dedup(seq: Sequence[str]) -> list[str]:
@@ -117,6 +125,7 @@ def dedup(seq: Sequence[str]) -> list[str]:
 
 def parse_domains(raw: str) -> list[str]:
     """Parse model output into a clean list of allowed domains."""
+
     def try_load(s: str) -> list[str]:
         try:
             obj = json.loads(s.strip())
@@ -137,22 +146,69 @@ def parse_domains(raw: str) -> list[str]:
     return dedup([d for d in domains if d in allowed])
 
 
+def make_auto_refiner(devset: Sequence[Example]) -> dspy.Module:
+    clf_for_eval = DomainClassifier()
+    banned = ("uber", "lyft", "bolt", "grab", "ola", "didi",
+              "chemist", "drugstore", "pharmacy", "tram", "subway", "metro")
+
+    def reward_fn(args, pred) -> float:
+        instr = (pred.revised_instructions or "").strip()
+        if not instr:
+            return 0.0
+
+        # Ограничители сложности/перечней
+        text = instr.lower()
+        if any(tok in text for tok in banned):
+            return 0.0
+        if len(instr) > 900:
+            return 0.0
+
+        # Метрика качества
+        acc, _ = evaluate(clf_for_eval, instr, devset)
+        return float(acc)
+
+    base = dspy.Predict(RefinerSig)
+    return dspy.Refine(module=base, N=6, reward_fn=reward_fn, threshold=1.0)
+
+
 def evaluate(
     program: DomainClassifier, instructions: str, dataset: Sequence[Example]
 ) -> tuple[float, list[ErrorCase]]:
+    # Refine/оптимизаторы DSPy могут выключать track_usage ради скорости.
+    # Гарантируем, что внутри оценки usage собирается.
+    dspy.settings.configure(track_usage=True)
+
     correct = 0
     errors: list[ErrorCase] = []
-    for ex in dataset:
+    usage_total: dict = {}
+
+    n = len(dataset)
+    print_every = max(1, n // 4)
+
+    for i, ex in enumerate(dataset, 1):
         out = program(instructions, ex["history"], ex["turn"])
         pred = parse_domains(out.domains_json)
         gt = [d.lower() for d in ex["gt"]]
+
+        try:
+            add_usage(usage_total, out.get_lm_usage())
+        except Exception:
+            pass
+
         if set(pred) == set(gt):
             correct += 1
         else:
             errors.append(
                 ErrorCase(history=ex["history"], turn=ex["turn"], gt=gt, pred=pred)
             )
-    acc = correct / len(dataset) if dataset else 0.0
+
+        if i % print_every == 0 or i == n:
+            print(
+                f"  progress {i}/{n} • usage {format_usage(usage_total)}",
+                flush=True,
+            )
+
+    acc = correct / n if n else 0.0
     return acc, errors
 
 
@@ -163,7 +219,7 @@ def build_error_report(errors: Sequence[ErrorCase], max_examples: int = 12) -> s
     for i, e in enumerate(errors[:max_examples]):
         h = e["history"] or "<empty>"
         lines.append(
-            f"Ex{i+1}\nH: {h}\nUt: {e['turn']}\nGT: {e['gt']}\nPred: {e['pred']}"
+            f"Ex{i + 1}\nH: {h}\nUt: {e['turn']}\nGT: {e['gt']}\nPred: {e['pred']}"
         )
     return (
         "Observed misclassifications on the dev set:\n\n"
@@ -174,30 +230,54 @@ def build_error_report(errors: Sequence[ErrorCase], max_examples: int = 12) -> s
 
 
 def offline_srp(
-    devset: Sequence[Example], instructions: str, max_iters: int = 3, tol: float = 5e-3
+    devset: Sequence[Example],
+    instructions: str,
+    max_iters: int = 3,
+    tol: float = 5e-3,
 ) -> dict[str, object]:
     clf = DomainClassifier()
-    ref = Refiner()
+    ref = make_auto_refiner(devset)  # лучший из N по нашей метрике
     instr = instructions
     best: dict[str, object] = {"instr": instr, "acc": 0.0, "errors": []}
 
     for it in range(1, max_iters + 1):
-        acc, errs = evaluate(clf, instr, devset)
-        print(f"[Iter {it}] accuracy={acc:.3f}  errors={len(errs)}")
-        if acc >= best["acc"]:
-            best.update({"instr": instr, "acc": acc, "errors": errs})
+        # 1) Пред‑оценка текущих правил
+        pre_acc, pre_errs = evaluate(clf, instr, devset)
+        print(f"[Iter {it} pre]  accuracy={pre_acc:.3f}  errors={len(pre_errs)}")
 
-        improved = acc - float(best["acc"])
-        if acc == 1.0 or (improved < tol and not errs):
-            break
+        prev_best = float(best["acc"])
+        if pre_acc >= prev_best:
+            best.update({"instr": instr, "acc": pre_acc, "errors": pre_errs})
 
-        report = build_error_report(errs)
-        revised = ref(instr, report).revised_instructions.strip()
+        # 2) Критик предлагает улучшение
+        report = build_error_report(pre_errs)
+        revised = ref(
+            current_instructions=instr,
+            error_report=report,
+        ).revised_instructions.strip()
+
         if not revised or revised == instr:
-            print("No effective revision produced; stopping.")
-            break
-        instr = revised
+            # нет эффективной правки → смотрим условие остановки по pre
+            if pre_acc == 1.0 or (pre_acc - prev_best < tol and not pre_errs):
+                break
+            continue
 
+        # 3) Пост‑оценка новой версии в той же итерации (виден прогресс)
+        post_acc, post_errs = evaluate(clf, revised, devset)
+        print(f"[Iter {it} post] accuracy={post_acc:.3f}  errors={len(post_errs)}")
+
+        # 4) Применяем улучшение, если оно реально лучше
+        if post_acc >= pre_acc:
+            instr = revised
+            if post_acc >= float(best["acc"]):
+                best.update({"instr": instr, "acc": post_acc, "errors": post_errs})
+
+        # 5) Ранняя остановка
+        improved = float(best["acc"]) - prev_best
+        if best["acc"] == 1.0 or (improved < tol and not best["errors"]):
+            break
+
+    # Финальная проверка «лучшего из бега»
     final_acc, final_errs = evaluate(DomainClassifier(), best["instr"], devset)
     print(f"\nFinal dev accuracy: {final_acc:.3f} on {len(devset)} examples")
     print("\nFinal instructions (P★):\n" + str(best["instr"]))

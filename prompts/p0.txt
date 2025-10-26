@@ -2,6 +2,7 @@ Classify the domain(s) of the USER's current turn Ut given the dialogue
 history H_{t-1}.
 
 Allowed domains:
+
 ["restaurant","attraction","hotel","taxi","train","bus","hospital","police","none"]
 
 Rules:
