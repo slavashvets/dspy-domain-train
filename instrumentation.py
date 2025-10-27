@@ -6,8 +6,10 @@ from dspy.utils.callback import BaseCallback
 
 
 class ConsoleProgress(BaseCallback):
-    """Короткий прогресс: считает LM-вызовы, печатает usage если доступен.
-    Устойчив к формам outputs: dict, list и вложенные структуры.
+    """Lightweight progress tracker for LM calls.
+
+    Counts LM invocations and prints token usage when available. Resilient to
+    nested output structures such as dicts and lists.
     """
 
     def __init__(self) -> None:
@@ -20,7 +22,7 @@ class ConsoleProgress(BaseCallback):
     # LM-level
     def on_lm_start(self, call_id: str, instance: Any, inputs: Dict[str, Any]) -> None:
         self.calls += 1
-        print(f"[{self.calls}] …", flush=True)
+        print(f"[{self.calls}] ...", flush=True)
 
     def on_lm_end(
         self,
@@ -28,7 +30,7 @@ class ConsoleProgress(BaseCallback):
         outputs: Any = None,
         exception: Optional[Exception] = None,
     ) -> None:
-        # Колбэки не должны падать — только логируем.
+        # Callbacks must never fail; log only.
         try:
             if exception:
                 print(f"[LM {self.calls}] error: {exception}", flush=True)
@@ -36,8 +38,8 @@ class ConsoleProgress(BaseCallback):
 
             tokens = self._extract_usage_totals(outputs)
             if tokens is None:
-                # usage недоступен — просто отметим завершение
-                print(f"[LM {self.calls}] ✓", flush=True)
+                # Usage unavailable; mark completion.
+                print(f"[LM {self.calls}] ok", flush=True)
                 return
 
             pt, ct, tt = tokens
@@ -46,7 +48,7 @@ class ConsoleProgress(BaseCallback):
             self.total += tt
             print(
                 f"[LM {self.calls}] +{tt} tok "
-                f"(Σ={self.total} • in={self.total_prompt} • out={self.total_completion})",
+                f"(sum={self.total} | in={self.total_prompt} | out={self.total_completion})",
                 flush=True,
             )
         except Exception as e:
@@ -56,8 +58,9 @@ class ConsoleProgress(BaseCallback):
 
     @staticmethod
     def _extract_usage_totals(outputs: Any) -> Optional[tuple[int, int, int]]:
-        """Достаёт usage из произвольной структуры outputs.
-        Возвращает (prompt, completion, total) или None.
+        """Extract usage totals from arbitrary outputs.
+
+        Returns (prompt_tokens, completion_tokens, total_tokens) or None.
         """
         if outputs is None:
             return None
@@ -66,13 +69,13 @@ class ConsoleProgress(BaseCallback):
 
         def visit(o: Any) -> None:
             if isinstance(o, dict):
-                # Предпочитаем явные контейнеры 'usage'/'token_usage'
+                # Prefer explicit containers like 'usage' or 'token_usage'.
                 for k in ("usage", "token_usage"):
                     v = o.get(k)
                     if isinstance(v, dict):
                         usage_dicts.append(v)
 
-                # Фолбэк: словарь уже выглядит как usage
+                # Fallback: the dict already looks like a usage payload.
                 keys = set(o.keys())
                 if keys & {
                     "prompt_tokens",
@@ -96,7 +99,7 @@ class ConsoleProgress(BaseCallback):
         if not usage_dicts:
             return None
 
-        # Суммируем всё найденное, избегая дубликатов по id()
+        # Sum everything we found, avoiding duplicates by id().
         seen: set[int] = set()
         p_sum = c_sum = t_sum = 0
 
@@ -129,13 +132,13 @@ class ConsoleProgress(BaseCallback):
 
 
 def add_usage(u_total: dict, u: Any) -> None:
-    """Суммирует usage от Prediction.get_lm_usage().
+    """Accumulate usage emitted by Prediction.get_lm_usage().
 
-    Поддерживаемые формы:
+    Supported shapes:
     - {lm_name: {prompt_tokens, completion_tokens, total_tokens}}
-    - {'usage': {...}, 'model': '...'} или {'token_usage': {...}, ...}
-    - [{'model': '...', 'usage': {...}}, ...] (списки)
-    - «Плоский» usage-словарь.
+    - {'usage': {...}, 'model': '...'} or {'token_usage': {...}, ...}
+    - [{'model': '...', 'usage': {...}}, ...] (lists)
+    - Flat usage dictionaries.
     """
     if not u:
         return
@@ -152,15 +155,15 @@ def add_usage(u_total: dict, u: Any) -> None:
         except Exception:
             pass
 
-    # Список записей
+    # List of records.
     if isinstance(u, list):
         for item in u:
             add_usage(u_total, item)
         return
 
-    # Явная мапа {lm_name: stats}
+    # Explicit mapping {lm_name: stats}.
     if isinstance(u, dict):
-        # Случай 1: {lm: {usage...}}
+        # Case 1: {lm_name: {usage...}}.
         if all(isinstance(v, dict) for v in u.values()) and any(
             {
                 "prompt_tokens",
@@ -179,7 +182,7 @@ def add_usage(u_total: dict, u: Any) -> None:
                     _acc(str(lm_name), stats)
             return
 
-        # Случай 2: {'usage': {...}, 'model': '...'}
+        # Case 2: {'usage': {...}, 'model': '...'}.
         stats = None
         if isinstance(u.get("usage"), dict):
             stats = u["usage"]
@@ -190,7 +193,7 @@ def add_usage(u_total: dict, u: Any) -> None:
             _acc(name, stats)
             return
 
-        # Случай 3: плоский usage-словарь
+        # Case 3: flat usage dictionary.
         if {
             "prompt_tokens",
             "input_tokens",
@@ -204,12 +207,12 @@ def add_usage(u_total: dict, u: Any) -> None:
             _acc(name, u)
             return
 
-    # Иначе — не распознали форму, пропускаем.
+    # Otherwise the structure is unknown; skip.
 
 
 def format_usage(u_total: dict) -> str:
     if not u_total:
-        return "—"
+        return "-"
     parts = []
     for lm, s in u_total.items():
         parts.append(f"{lm}: total={s['total']}, in={s['input']}, out={s['output']}")

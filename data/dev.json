@@ -1,15 +1,35 @@
 [
-  {"history": "", "turn": "I need a taxi to the Hilton Hotel.", "gt": ["taxi"]},
-  {"history": "", "turn": "Book a room near the central station.", "gt": ["hotel"]},
-  {"history": "", "turn": "Find a museum near the station.", "gt": ["attraction"]},
+  {
+    "history": "",
+    "turn": "I need a taxi to the Hilton Hotel.",
+    "gt": ["taxi"]
+  },
+  {
+    "history": "",
+    "turn": "Book a room near the central station.",
+    "gt": ["hotel"]
+  },
+  {
+    "history": "",
+    "turn": "Find a museum near the station.",
+    "gt": ["attraction"]
+  },
   {
     "history": "",
     "turn": "What's the fastest train to Oxford tomorrow morning?",
     "gt": ["train"]
   },
-  {"history": "", "turn": "Bus 42 timetable for Sunday", "gt": ["bus"]},
-  {"history": "", "turn": "Is there an emergency room open now?", "gt": ["hospital"]},
-  {"history": "", "turn": "Call the police, my wallet was stolen.", "gt": ["police"]},
+  { "history": "", "turn": "Bus 42 timetable for Sunday", "gt": ["bus"] },
+  {
+    "history": "",
+    "turn": "Is there an emergency room open now?",
+    "gt": ["hospital"]
+  },
+  {
+    "history": "",
+    "turn": "Call the police, my wallet was stolen.",
+    "gt": ["police"]
+  },
   {
     "history": "",
     "turn": "Reserve at a vegetarian-friendly place downtown.",
@@ -45,10 +65,95 @@
     "turn": "The restaurant was too noisy. Anyway, need a cab back.",
     "gt": ["taxi"]
   },
-  {"history": "", "turn": "Hi!", "gt": ["none"]},
+  { "history": "", "turn": "Hi!", "gt": ["none"] },
   {
     "history": "",
     "turn": "Is there a kid-friendly museum near our hotel?",
-    "gt": ["attraction", "hotel"]
+    "gt": ["attraction"]
+  },
+  {
+    "history": "",
+    "turn": "Book a train to Oxford tomorrow and arrange a taxi to the station.",
+    "gt": ["train", "taxi"]
+  },
+  {
+    "history": "",
+    "turn": "Reserve a hotel for tonight and a vegetarian restaurant nearby.",
+    "gt": ["hotel", "restaurant"]
+  },
+  {
+    "history": "",
+    "turn": "I missed my train, find the next bus or call me a taxi now.",
+    "gt": ["bus", "taxi"]
+  },
+  {
+    "history": "We booked The Grand Hotel.",
+    "turn": "Check if late checkout is available and send a taxi to the lobby.",
+    "gt": ["hotel", "taxi"]
+  },
+  {
+    "history": "",
+    "turn": "call the police and find the nearest hospital",
+    "gt": ["police", "hospital"]
+  },
+  {
+    "history": "",
+    "turn": "Move our dinner reservation to 8pm and book a taxi home after.",
+    "gt": ["restaurant", "taxi"]
+  },
+  {
+    "history": "",
+    "turn": "Is there a museum open after 6pm? Also, book a table close to it.",
+    "gt": ["attraction", "restaurant"]
+  },
+  {
+    "history": "",
+    "turn": "Cancel the bus and switch to a train.",
+    "gt": ["bus", "train"]
+  },
+  {
+    "history": "",
+    "turn": "Find a hospital with an emergency room and a taxi that can get me there fast.",
+    "gt": ["hospital", "taxi"]
+  },
+  {
+    "history": "",
+    "turn": "Book a hotel for Friday and buy train tickets for Saturday morning.",
+    "gt": ["hotel", "train"]
+  },
+  {
+    "history": "",
+    "turn": "What's the last bus tonight, and if it's too late, book me a taxi.",
+    "gt": ["bus", "taxi"]
+  },
+  {
+    "history": "We discussed a museum earlier.",
+    "turn": "Get tickets to that museum and book lunch nearby.",
+    "gt": ["attraction", "restaurant"]
+  },
+  {
+    "history": "",
+    "turn": "Reserve a quiet restaurant and a hotel with a pool for the weekend.",
+    "gt": ["restaurant", "hotel"]
+  },
+  {
+    "history": "",
+    "turn": "I lost my wallet at the station - call the police and check the next train to Cambridge.",
+    "gt": ["police", "train"]
+  },
+  {
+    "history": "",
+    "turn": "Cancel the restaurant, find a kid-friendly museum, and get a taxi there.",
+    "gt": ["restaurant", "attraction", "taxi"]
+  },
+  {
+    "history": "",
+    "turn": "From the airport: is there a night bus? If not, order a taxi.",
+    "gt": ["bus", "taxi"]
+  },
+  {
+    "history": "",
+    "turn": "Book a hotel near the central station and a table for 7pm.",
+    "gt": ["hotel", "restaurant"]
   }
 ]

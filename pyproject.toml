@@ -7,3 +7,13 @@ dependencies = [
     "dspy>=3.0.3",
     "environs>=14.3.0",
 ]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.18.2",
+    "ruff>=0.14.2",
+]
+
+[[tool.mypy.overrides]]
+module = ["dspy", "dspy.*"]
+ignore_missing_imports = true

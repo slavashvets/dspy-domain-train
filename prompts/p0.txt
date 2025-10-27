@@ -1,13 +1,10 @@
-Classify the domain(s) of the USER's current turn Ut given the dialogue
-history H_{t-1}.
-
-Allowed domains:
-
-["restaurant","attraction","hotel","taxi","train","bus","hospital","police","none"]
-
-Rules:
-- Return STRICT JSON only: {"domains": ["..."]}
-- Use ONLY the allowed lowercase names.
-- If multiple actions are requested, include multiple domains.
-- If chit-chat/meta or none apply, return ["none"] only.
-- Use H_{t-1} to resolve references (it/there/also).
+Classify the domains:
+- restaurant
+- attraction
+- hotel
+- taxi
+- train
+- bus
+- hospital
+- police
+- none

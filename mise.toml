@@ -4,3 +4,10 @@ python = "3.13"
 [tasks.dev]
 description = "Run offline SRP once"
 run = "uv run main.py"
+
+[tasks.lint]
+description = "Run linters"
+run = [
+  "uv run --no-sync --offline --group dev ruff check . ",
+  "uv run --no-sync --offline --group dev mypy --warn-redundant-casts --warn-unused-ignores .",
+]
