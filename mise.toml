@@ -1,6 +1,9 @@
 [tools]
 python = "3.13"
 
+[settings]
+python.uv_venv_auto = true
+
 [tasks.dev]
 description = "Run offline SRP once"
 run = "uv run main.py"
