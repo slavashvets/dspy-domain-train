@@ -1,4 +1,4 @@
-# dspy-train-classification
+# dspy-domain-train
 
 Offline SRP loop for a small domain classifier built with DSPy and Azure OpenAI.
 
