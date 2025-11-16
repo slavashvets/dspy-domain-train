@@ -22,12 +22,18 @@ DOMAINS: tuple[str, ...] = (
 
 
 class DomainClassificationSig(dspy.Signature):
-    """Return strictly JSON: {"domains": ["..."]} (lowercase, no explanations)."""
+    """Return JSON object: {"domains": ["..."]} (lowercase, no explanations)."""
 
     rules: str = dspy.InputField(desc="Classification rules.")
     history: str = dspy.InputField()
     turn: str = dspy.InputField()
-    domains_json: str = dspy.OutputField()
+    # Structured output: list of domains, JSONAdapter turns this into JSON Schema
+    domains: list[str] = dspy.OutputField(
+        desc=(
+            "List of domains for this turn, chosen only from: "
+            "restaurant, attraction, hotel, taxi, train, bus, hospital, police, none."
+        )
+    )
 
 
 class DomainClassifier(dspy.Module):
@@ -107,7 +113,24 @@ def _parse_domains_from_str(raw: str) -> list[str]:
 
 
 def parse_prediction(pred: dspy.Prediction) -> list[str]:
-    return _parse_domains_from_str(pred.domains_json)
+    # New path: structured output via JSONAdapter -> domains: list[str]
+    raw_domains = getattr(pred, "domains", None)
+    if raw_domains:
+        if not isinstance(raw_domains, (list, tuple)):
+            raw_domains = [raw_domains]
+
+        raw_list = [str(v).lower().strip() for v in raw_domains]
+        allowed = set(DOMAINS)
+        filtered = dedup([d for d in raw_list if d in allowed])
+
+        if "none" in filtered and len(filtered) > 1:
+            filtered = [d for d in filtered if d != "none"]
+
+        return filtered or ["none"]
+
+    # Legacy path: JSON string fallback for older checkpoints
+    raw_str = getattr(pred, "domains_json", "") or ""
+    return _parse_domains_from_str(raw_str)
 
 
 def build_error_report(errors: Sequence[ErrorCase], max_examples: int = 12) -> str:

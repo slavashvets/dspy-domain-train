@@ -48,7 +48,15 @@ def configure_lm(settings: Settings) -> tuple[dspy.LM, dspy.LM]:
 
     # Eval / classifier LM
     lm_eval = _make_lm(settings.eval)
-    dspy.configure(lm=lm_eval, track_usage=True)
+
+    # Enable JSONAdapter globally so signatures get JSON Schema structured outputs
+    json_adapter = dspy.JSONAdapter()
+
+    dspy.configure(
+        lm=lm_eval,
+        adapter=json_adapter,
+        track_usage=True,
+    )
 
     # Refiner LM
     lm_refine = _make_lm(settings.refine)
@@ -145,18 +153,11 @@ def offline_srp(
         report = build_error_report(pre_errs)
 
         # Propose a revision
-        if refiner_lm is not None:
-            with dspy.context(lm=refiner_lm, track_usage=False):
-                revised = ref(
-                    current_instructions=instr,
-                    error_report=report,
-                ).revised_instructions.strip()
-        else:
-            with dspy.context(track_usage=False):
-                revised = ref(
-                    current_instructions=instr,
-                    error_report=report,
-                ).revised_instructions.strip()
+        with dspy.context(lm=refiner_lm, adapter=dspy.ChatAdapter(), track_usage=False):
+            revised = ref(
+                current_instructions=instr,
+                error_report=report,
+            ).revised_instructions.strip()
 
         if not revised or revised == instr:
             # No effective update; stop if we're already good enough.
