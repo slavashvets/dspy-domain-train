@@ -41,7 +41,7 @@ def _make_lm(cfg: AzureOpenAIModelSettings) -> dspy.LM:
     )
 
 
-def configure_lm(settings: Settings) -> dict[str, dspy.LM]:
+def configure_lm(settings: Settings) -> tuple[dspy.LM, dspy.LM]:
     """Configure all LMs via strongly typed settings instead of ad-hoc env reads."""
     dspy.configure_cache(enable_disk_cache=False, enable_memory_cache=False)
     logging.getLogger("dspy").setLevel(logging.INFO)
@@ -53,7 +53,7 @@ def configure_lm(settings: Settings) -> dict[str, dspy.LM]:
     # Refiner LM
     lm_refine = _make_lm(settings.refine)
 
-    return {"eval": lm_eval, "refine": lm_refine}
+    return lm_eval, lm_refine
 
 
 def evaluate(

@@ -12,7 +12,7 @@ from training import BestResult, configure_lm, offline_srp
 
 def main() -> None:
     settings = get_settings()
-    lms = configure_lm(settings)
+    lm_eval, lm_refine = configure_lm(settings)
 
     devset = load_devset(settings.devset_path)
     p0 = load_text(settings.prompt_path)
@@ -26,8 +26,8 @@ def main() -> None:
         make_auto_refiner=make_auto_refiner,
         max_iters=settings.max_iters,
         tol=settings.tol,
-        eval_lm=lms["eval"],
-        refiner_lm=lms["refine"],
+        eval_lm=lm_eval,
+        refiner_lm=lm_refine,
         instr_max_len=settings.instr_max_len,
         refiner_candidates=settings.refiner_candidates,
         refiner_retries=settings.refiner_retries,
