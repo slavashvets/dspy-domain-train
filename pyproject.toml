@@ -4,8 +4,9 @@ version = "0.1.0"
 description = "Offline SRP"
 requires-python = ">=3.13"
 dependencies = [
-    "dspy>=3.0.3",
-    "environs>=14.3.0",
+    "dspy>=3.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
 ]
 
 [dependency-groups]
