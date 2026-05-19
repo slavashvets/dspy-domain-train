@@ -6,54 +6,92 @@ import dspy
 
 from .domain_task import domain_metric, load_text
 from .settings import get_settings
-from .training import configure_lm, load_examples, optimize, split_dataset
+from .training import (
+    configure_lm,
+    get_instructions,
+    load_examples,
+    optimize_copro,
+    optimize_gepa,
+    select_best_candidate,
+)
 
 
 def main() -> None:
     settings = get_settings()
     lm_eval, lm_refine = configure_lm(settings)
 
-    examples = load_examples(settings.devset_path)
-    trainset, valset = split_dataset(examples, settings.val_ratio, settings.seed)
+    trainset = load_examples(settings.train_path, settings.max_train, settings.seed)
+    valset = load_examples(settings.dev_path, settings.max_dev, settings.seed)
+    testset = load_examples(settings.test_path, settings.max_test, settings.seed)
     p0 = load_text(settings.prompt_path)
 
     run_dir = Path("runs") / datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%S")
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Train: {len(trainset)} | Val: {len(valset)}")
+    print(f"Train: {len(trainset)} | Val: {len(valset)} | Test: {len(testset)}")
+    print(f"Optimizer: {settings.optimizer}")
     print(f"Log dir: {run_dir}")
 
-    optimized = optimize(
-        trainset=trainset,
-        valset=valset,
+    if settings.optimizer == "copro":
+        optimized = optimize_copro(
+            trainset=valset,
+            metric=domain_metric,
+            initial_instructions=p0,
+            prompt_model=lm_refine,
+            breadth=settings.copro_breadth,
+            depth=settings.copro_depth,
+            init_temperature=settings.copro_init_temperature,
+            num_threads=settings.num_threads,
+        )
+    else:
+        optimized = optimize_gepa(
+            trainset=trainset,
+            valset=valset,
+            metric=domain_metric,
+            initial_instructions=p0,
+            reflection_lm=lm_refine,
+            gepa_auto=settings.gepa_auto,
+            num_threads=settings.num_threads,
+            log_dir=str(run_dir / "gepa"),
+        )
+
+    optimized = select_best_candidate(
+        optimized=optimized,
+        evalset=valset,
         metric=domain_metric,
-        initial_instructions=p0,
-        reflection_lm=lm_refine,
-        gepa_auto=settings.gepa_auto,
+        max_instruction_words=settings.max_instruction_words,
         num_threads=settings.num_threads,
-        log_dir=str(run_dir / "gepa"),
     )
 
     evaluator = dspy.Evaluate(
-        devset=valset,
+        devset=testset,
         metric=domain_metric,
         display_progress=True,
     )
     result = evaluator(optimized)
-    print(f"\nVal score: {result.score:.1f}%")
+    print(f"\nTest score: {result.score:.1f}%")
+
+    final_instructions = get_instructions(optimized)
+    print(f"\nFinal instructions:\n{final_instructions}")
 
     optimized.save(str(run_dir / "program.json"))
+    (run_dir / "final_instructions.txt").write_text(
+        final_instructions + "\n", encoding="utf-8"
+    )
 
     metadata = {
         "timestamp": datetime.now(tz=UTC).isoformat(),
         "dspy_version": dspy.__version__,
-        "val_score": result.score,
+        "optimizer": settings.optimizer,
+        "test_score": result.score,
         "train_size": len(trainset),
         "val_size": len(valset),
+        "test_size": len(testset),
+        "final_instruction_words": len(final_instructions.split()),
         "settings": {
-            "gepa_auto": settings.gepa_auto,
             "num_threads": settings.num_threads,
             "seed": settings.seed,
+            "max_instruction_words": settings.max_instruction_words,
             "eval_deployment": settings.eval.deployment,
             "refine_deployment": settings.refine.deployment,
         },
