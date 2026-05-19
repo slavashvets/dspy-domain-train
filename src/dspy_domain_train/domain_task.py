@@ -1,12 +1,12 @@
 import json
 import re
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 from uuid import uuid4
 
 import dspy
 
-from training import ErrorCase, Example, evaluate
+from .training import ErrorCase, Example, evaluate
 
 DOMAINS: tuple[str, ...] = (
     "restaurant",
@@ -51,9 +51,11 @@ class RefinerSig(dspy.Signature):
     CRITICAL RULES:
     - No dataset-specific examples or phrases.
     - Create GENERAL rules only.
-    - Avoid overprediction: possessive references (my/our/their...) and location anchors (near/at/to/from...)
-      do NOT add a domain unless the user explicitly requests something about that entity.
-    - Keep the instructions as short and concise as possible: prefer minimal bullet points over long prose.
+    - Avoid overprediction: possessive references (my/our/their...) and
+      location anchors (near/at/to/from...) do NOT add a domain unless the user
+      explicitly requests something about that entity.
+    - Keep the instructions short and concise: prefer minimal bullet points
+      over long prose.
     """
 
     current_instructions: str = dspy.InputField(
@@ -63,7 +65,10 @@ class RefinerSig(dspy.Signature):
         desc="Analysis of classification errors with patterns"
     )
     revised_instructions: str = dspy.OutputField(
-        desc="Revised instructions with ONLY general rules, NO specific examples from dataset"
+        desc=(
+            "Revised instructions with ONLY general rules, "
+            "NO specific examples from dataset"
+        )
     )
 
 
@@ -166,21 +171,25 @@ def build_error_report(errors: Sequence[ErrorCase], max_examples: int = 12) -> s
 
     if possessive_errors:
         lines.append(
-            f"\n- {len(possessive_errors)}/{len(errors)} errors involve possessive pronouns (our/my/their)."
+            f"\n- {len(possessive_errors)}/{len(errors)} errors involve "
+            "possessive pronouns (our/my/their)."
         )
         lines.append(
             "  Guideline: DO NOT add a domain solely because an entity is possessed."
         )
         lines.append(
-            "  Add that entity's domain ONLY when the user requests info/action about it (book/cancel/change/check/features/availability/issue)."
+            "  Add that entity's domain ONLY when the user requests info/action "
+            "about it (book/cancel/change/check/features/availability/issue)."
         )
 
     if location_errors:
         lines.append(
-            f"\n- {len(location_errors)}/{len(errors)} errors involve location anchors (near/close to/at/to/from)."
+            f"\n- {len(location_errors)}/{len(errors)} errors involve "
+            "location anchors (near/close to/at/to/from)."
         )
         lines.append(
-            "  Guideline: Treat anchors as context only. Include the domain of the actual request target, not of the anchor."
+            "  Guideline: Treat anchors as context only. Include the domain of "
+            "the actual request target, not of the anchor."
         )
 
     if missing_domains:
@@ -193,7 +202,8 @@ def build_error_report(errors: Sequence[ErrorCase], max_examples: int = 12) -> s
             "\nPriority fix: Add a GENERAL anti-overprediction rule for possessives:"
         )
         lines.append(
-            "- Possessive references DO NOT imply engagement; require explicit intent to include that domain."
+            "- Possessive references DO NOT imply engagement; require explicit "
+            "intent to include that domain."
         )
 
     lines.append("\n\n=== ERROR EXAMPLES ===")
@@ -226,10 +236,12 @@ def build_error_report(errors: Sequence[ErrorCase], max_examples: int = 12) -> s
 
     lines.append("\n\n=== RECOMMENDATION ===")
     lines.append(
-        "Refine rules to eliminate extra domains from possessive/location mentions while keeping JSON format and the candidate set unchanged."
+        "Refine rules to eliminate extra domains from possessive/location "
+        "mentions while keeping JSON format and the candidate set unchanged."
     )
     lines.append(
-        "\nIMPORTANT: Create GENERAL rules based on patterns, NOT dataset-specific examples."
+        "\nIMPORTANT: Create GENERAL rules based on patterns, "
+        "NOT dataset-specific examples."
     )
     lines.append(
         "Priority: Add anti-overprediction rules for possessives and location anchors."

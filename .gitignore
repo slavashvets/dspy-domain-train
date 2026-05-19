@@ -5,12 +5,28 @@ build/
 dist/
 wheels/
 *.egg-info
+.coverage
+htmlcov/
 
 # Virtual environments
 .venv
 
 # Local environment files
 .env
+.env.bak
+settings.local.toml
 
-# Other
+# Tool caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.uv_cache/
+.dspy_cache/
+
+# Local task/agent state
+.beads/
+
+# Other local files
+.DS_Store
 log*.txt
+*.log

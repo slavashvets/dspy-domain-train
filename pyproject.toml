@@ -1,19 +1,41 @@
 [project]
 name = "dspy-domain-train"
 version = "0.1.0"
-description = "Train multilabel classification of data using dspy"
-requires-python = ">=3.13"
+description = "Offline DSPy self-refinement loop for multilabel domain classification"
+readme = "README.md"
+requires-python = ">=3.13,<3.15"
 dependencies = [
-    "dspy>=3.0.0",
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
+    "dspy>=3.2.1",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.1",
 ]
+
+[project.scripts]
+dspy-domain-train = "dspy_domain_train.main:main"
+
+[build-system]
+requires = ["uv_build>=0.11.6,<0.12"]
+build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "mypy>=1.18.2",
-    "ruff>=0.14.2",
+    "mypy>=2.1.0",
+    "ruff>=0.15.13",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.13"
+files = ["src", "tests"]
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
 module = ["dspy", "dspy.*"]

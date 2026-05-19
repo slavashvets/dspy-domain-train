@@ -1,0 +1,103 @@
+import os
+import tempfile
+import unittest
+from pathlib import Path
+
+from pydantic import ValidationError
+
+import dspy_domain_train.settings as settings_module
+from dspy_domain_train.settings import Settings
+from dspy_domain_train.toml import config_dir
+
+BASE_TOML = """
+devset_path = "data/dev.json"
+prompt_path = "prompts/p0.txt"
+max_iters = 2
+tol = 0.01
+refiner_candidates = 3
+refiner_retries = 2
+instr_max_len = 40
+"""
+
+LOCAL_TOML = """
+[eval]
+endpoint = "https://eval.example.openai.azure.com/"
+api_key = "eval-secret"
+api_version = "v1"
+deployment = "eval-deployment"
+model_type = "chat"
+temperature = 0.0
+
+[refine]
+endpoint = "https://refine.example.openai.azure.com/"
+api_key = "refine-secret"
+api_version = "v1"
+deployment = "refine-deployment"
+model_type = "chat"
+temperature = 1.0
+max_tokens = 16000
+"""
+
+
+class SettingsTomlTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp_dir.name).resolve()
+        self.cwd = Path.cwd()
+        self.env = {
+            key: value for key, value in os.environ.items() if key.startswith("DSPY_")
+        }
+        self.profile = settings_module._PROFILE
+
+        for key in self.env:
+            os.environ.pop(key, None)
+        settings_module._PROFILE = "local"
+        config_dir.cache_clear()
+        os.chdir(self.root)
+
+    def tearDown(self) -> None:
+        os.chdir(self.cwd)
+        config_dir.cache_clear()
+        settings_module._PROFILE = self.profile
+        for key in list(os.environ):
+            if key.startswith("DSPY_"):
+                os.environ.pop(key, None)
+        os.environ.update(self.env)
+        self.temp_dir.cleanup()
+
+    def write_settings(self, local: str = LOCAL_TOML) -> None:
+        (self.root / "settings.toml").write_text(BASE_TOML, encoding="utf-8")
+        (self.root / "settings.local.toml").write_text(local, encoding="utf-8")
+
+    def test_loads_base_and_local_toml_with_relative_paths(self) -> None:
+        self.write_settings()
+
+        settings = Settings()  # type: ignore[call-arg]
+
+        self.assertEqual(settings.max_iters, 2)
+        self.assertEqual(settings.refiner_retries, 2)
+        self.assertEqual(settings.eval.deployment, "eval-deployment")
+        self.assertEqual(settings.refine.max_tokens, 16000)
+        self.assertEqual(settings.eval.api_key.get_secret_value(), "eval-secret")
+        self.assertEqual(settings.devset_path, self.root / "data/dev.json")
+        self.assertEqual(settings.prompt_path, self.root / "prompts/p0.txt")
+
+    def test_env_overrides_toml(self) -> None:
+        self.write_settings()
+        os.environ["DSPY_MAX_ITERS"] = "9"
+        os.environ["DSPY_EVAL__DEPLOYMENT"] = "env-deployment"
+
+        settings = Settings()  # type: ignore[call-arg]
+
+        self.assertEqual(settings.max_iters, 9)
+        self.assertEqual(settings.eval.deployment, "env-deployment")
+
+    def test_rejects_unknown_toml_keys(self) -> None:
+        self.write_settings(local=LOCAL_TOML + "\nunknown = true\n")
+
+        with self.assertRaises(ValidationError):
+            Settings()  # type: ignore[call-arg]
+
+
+if __name__ == "__main__":
+    unittest.main()

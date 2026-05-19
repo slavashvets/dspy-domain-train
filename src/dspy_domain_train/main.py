@@ -1,4 +1,4 @@
-from domain_task import (
+from .domain_task import (
     DomainClassifier,
     build_error_report,
     load_devset,
@@ -6,8 +6,8 @@ from domain_task import (
     make_auto_refiner,
     parse_prediction,
 )
-from settings import get_settings
-from training import BestResult, configure_lm, offline_srp
+from .settings import get_settings
+from .training import BestResult, configure_lm, offline_srp
 
 
 def main() -> None:

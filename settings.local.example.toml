@@ -1,0 +1,20 @@
+# Copy this file to settings.local.toml and fill in local Azure OpenAI details.
+# settings.local.toml is git-ignored.
+
+[eval]
+endpoint = "https://westeurope.api.cognitive.microsoft.com/"
+api_key = "your-main-api-key"
+api_version = "v1"
+deployment = "gpt-4-1"
+model_type = "chat"
+temperature = 0.0
+# max_tokens = 4096
+
+[refine]
+endpoint = "https://westeurope.api.cognitive.microsoft.com/"
+api_key = "your-refine-api-key"
+api_version = "v1"
+deployment = "gpt-5"
+model_type = "chat"
+temperature = 1.0
+max_tokens = 16000

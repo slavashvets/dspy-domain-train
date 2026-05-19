@@ -1,16 +1,40 @@
 [tools]
-python = "3.13"
+python = "3.13.9"
+uv = "0.11.15"
 
 [settings]
 python.uv_venv_auto = true
 
+[tasks.sync]
+description = "Install locked project dependencies"
+run = "uv sync --locked --group dev"
+
 [tasks.dev]
 description = "Run offline SRP once"
-run = "uv run main.py"
+run = "LITELLM_LOG=ERROR uv run --locked dspy-domain-train"
 
 [tasks.lint]
 description = "Run linters"
 run = [
-  "uv run --no-sync --offline --group dev ruff check . ",
-  "uv run --no-sync --offline --group dev mypy --warn-redundant-casts --warn-unused-ignores .",
+  "uv run --locked --group dev ruff check .",
+  "uv run --locked --group dev ruff format --check .",
+  "uv run --locked --group dev mypy .",
+]
+
+[tasks.format]
+description = "Format Python files"
+run = "uv run --locked --group dev ruff format ."
+
+[tasks.test]
+description = "Run unit tests"
+run = "LITELLM_LOG=ERROR uv run --locked python -m unittest discover -s tests"
+
+[tasks.check]
+description = "Run all local checks"
+run = [
+  "uv run --locked --group dev ruff check .",
+  "uv run --locked --group dev ruff format --check .",
+  "uv run --locked --group dev mypy .",
+  "LITELLM_LOG=ERROR uv run --locked python -m unittest discover -s tests",
+  "uv run --locked python -m compileall -q src tests",
 ]

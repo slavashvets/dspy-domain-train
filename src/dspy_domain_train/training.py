@@ -1,11 +1,12 @@
 import logging
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Callable, Sequence, TypedDict
+from typing import TypedDict
 
 import dspy
 
-from instrumentation import add_usage, format_usage
-from settings import AzureOpenAIModelSettings, Settings
+from .instrumentation import add_usage, format_usage
+from .settings import AzureOpenAIModelSettings, Settings
 
 
 class Example(TypedDict):
@@ -35,7 +36,7 @@ def _make_lm(cfg: AzureOpenAIModelSettings) -> dspy.LM:
         model_type=cfg.model_type,
         api_base=str(cfg.endpoint),
         api_version=cfg.api_version,
-        api_key=cfg.api_key,
+        api_key=cfg.api_key.get_secret_value(),
         temperature=cfg.temperature,
         max_tokens=cfg.max_tokens,
     )

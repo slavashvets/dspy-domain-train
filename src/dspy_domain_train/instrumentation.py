@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from dspy.utils.callback import BaseCallback
 
@@ -20,7 +20,7 @@ class ConsoleProgress(BaseCallback):
         self.total = 0
 
     # LM-level
-    def on_lm_start(self, call_id: str, instance: Any, inputs: Dict[str, Any]) -> None:
+    def on_lm_start(self, call_id: str, instance: Any, inputs: dict[str, Any]) -> None:
         self.calls += 1
         print(f"[{self.calls}] ...", flush=True)
 
@@ -28,7 +28,7 @@ class ConsoleProgress(BaseCallback):
         self,
         call_id: str,
         outputs: Any = None,
-        exception: Optional[Exception] = None,
+        exception: Exception | None = None,
     ) -> None:
         # Callbacks must never fail; log only.
         try:
@@ -46,9 +46,12 @@ class ConsoleProgress(BaseCallback):
             self.total_prompt += pt
             self.total_completion += ct
             self.total += tt
+            usage_summary = (
+                f"sum={self.total} | in={self.total_prompt} "
+                f"| out={self.total_completion}"
+            )
             print(
-                f"[LM {self.calls}] +{tt} tok "
-                f"(sum={self.total} | in={self.total_prompt} | out={self.total_completion})",
+                f"[LM {self.calls}] +{tt} tok ({usage_summary})",
                 flush=True,
             )
         except Exception as e:
@@ -57,7 +60,7 @@ class ConsoleProgress(BaseCallback):
     # --- helpers ---------------------------------------------------------
 
     @staticmethod
-    def _extract_usage_totals(outputs: Any) -> Optional[tuple[int, int, int]]:
+    def _extract_usage_totals(outputs: Any) -> tuple[int, int, int] | None:
         """Extract usage totals from arbitrary outputs.
 
         Returns (prompt_tokens, completion_tokens, total_tokens) or None.
@@ -65,7 +68,7 @@ class ConsoleProgress(BaseCallback):
         if outputs is None:
             return None
 
-        usage_dicts: list[Dict[str, Any]] = []
+        usage_dicts: list[dict[str, Any]] = []
 
         def visit(o: Any) -> None:
             if isinstance(o, dict):
@@ -145,8 +148,18 @@ def add_usage(u_total: dict, u: Any) -> None:
 
     def _acc(name: str, stats: dict) -> None:
         bucket = u_total.setdefault(name, {"input": 0, "output": 0, "total": 0})
-        ip = stats.get("prompt_tokens") or stats.get("input_tokens") or stats.get("prompt") or 0
-        op = stats.get("completion_tokens") or stats.get("output_tokens") or stats.get("completion") or 0
+        ip = (
+            stats.get("prompt_tokens")
+            or stats.get("input_tokens")
+            or stats.get("prompt")
+            or 0
+        )
+        op = (
+            stats.get("completion_tokens")
+            or stats.get("output_tokens")
+            or stats.get("completion")
+            or 0
+        )
         tt = stats.get("total_tokens") or (ip or 0) + (op or 0)
         try:
             bucket["input"] += int(ip or 0)
@@ -164,19 +177,23 @@ def add_usage(u_total: dict, u: Any) -> None:
     # Explicit mapping {lm_name: stats}.
     if isinstance(u, dict):
         # Case 1: {lm_name: {usage...}}.
-        if all(isinstance(v, dict) for v in u.values()) and any(
-            {
-                "prompt_tokens",
-                "input_tokens",
-                "prompt",
-                "completion_tokens",
-                "output_tokens",
-                "completion",
-                "total_tokens",
-            }
-            & set(v.keys())
-            for v in u.values()
-        ) and not ("usage" in u or "token_usage" in u):
+        if (
+            all(isinstance(v, dict) for v in u.values())
+            and any(
+                {
+                    "prompt_tokens",
+                    "input_tokens",
+                    "prompt",
+                    "completion_tokens",
+                    "output_tokens",
+                    "completion",
+                    "total_tokens",
+                }
+                & set(v.keys())
+                for v in u.values()
+            )
+            and not ("usage" in u or "token_usage" in u)
+        ):
             for lm_name, stats in u.items():
                 if isinstance(stats, dict):
                     _acc(str(lm_name), stats)
