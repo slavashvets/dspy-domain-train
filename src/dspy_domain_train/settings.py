@@ -60,13 +60,25 @@ class Settings(BaseSettings):
     eval: AzureOpenAIModelSettings
     refine: AzureOpenAIModelSettings
 
-    devset_path: ConfigPath
+    train_path: ConfigPath
+    dev_path: ConfigPath
+    test_path: ConfigPath
     prompt_path: ConfigPath
 
-    gepa_auto: Literal["light", "medium", "heavy"] = "light"
+    optimizer: Literal["copro", "gepa"] = "copro"
     num_threads: int = 4
-    val_ratio: float = Field(default=0.2, gt=0.0, lt=1.0)
     seed: int = 42
+    max_train: int | None = None
+    max_dev: int | None = None
+    max_test: int | None = None
+
+    copro_breadth: int = Field(default=10, ge=2)
+    copro_depth: int = Field(default=3, ge=1)
+    copro_init_temperature: float = Field(default=1.4, ge=0.0)
+
+    gepa_auto: Literal["light", "medium", "heavy"] = "light"
+
+    max_instruction_words: int = Field(default=150, ge=20)
 
 
 def get_settings() -> Settings:

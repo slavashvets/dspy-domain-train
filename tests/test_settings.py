@@ -10,11 +10,12 @@ from dspy_domain_train.settings import Settings
 from dspy_domain_train.toml import config_dir
 
 BASE_TOML = """
-devset_path = "data/dev.json"
+train_path = "data/train.json"
+dev_path = "data/dev.json"
+test_path = "data/test.json"
 prompt_path = "prompts/p0.txt"
 gepa_auto = "light"
 num_threads = 4
-val_ratio = 0.2
 seed = 42
 """
 
@@ -78,7 +79,9 @@ class SettingsTomlTests(unittest.TestCase):
         self.assertEqual(settings.eval.deployment, "eval-deployment")
         self.assertEqual(settings.refine.max_tokens, 16000)
         self.assertEqual(settings.eval.api_key.get_secret_value(), "eval-secret")
-        self.assertEqual(settings.devset_path, self.root / "data/dev.json")
+        self.assertEqual(settings.train_path, self.root / "data/train.json")
+        self.assertEqual(settings.dev_path, self.root / "data/dev.json")
+        self.assertEqual(settings.test_path, self.root / "data/test.json")
         self.assertEqual(settings.prompt_path, self.root / "prompts/p0.txt")
 
     def test_env_overrides_toml(self) -> None:
