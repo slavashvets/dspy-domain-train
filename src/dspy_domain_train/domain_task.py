@@ -2,33 +2,23 @@ import json
 import re
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args
 
 import dspy
 
 Domain = Literal[
-    "restaurant",
     "attraction",
-    "hotel",
-    "taxi",
-    "train",
     "bus",
     "hospital",
+    "hotel",
     "police",
+    "restaurant",
+    "taxi",
+    "train",
     "none",
 ]
 
-DOMAINS: tuple[str, ...] = (
-    "restaurant",
-    "attraction",
-    "hotel",
-    "taxi",
-    "train",
-    "bus",
-    "hospital",
-    "police",
-    "none",
-)
+DOMAINS: tuple[str, ...] = get_args(Domain)
 
 
 class DomainClassificationSig(dspy.Signature):
