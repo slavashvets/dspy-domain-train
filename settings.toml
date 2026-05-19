@@ -1,6 +1,16 @@
-devset_path = "data/dev.json"
+train_path = "data/train.json"
+dev_path = "data/dev.json"
+test_path = "data/test.json"
 prompt_path = "prompts/p0.txt"
-gepa_auto = "light"
+
+optimizer = "copro"
 num_threads = 4
-val_ratio = 0.2
 seed = 42
+
+copro_breadth = 10
+copro_depth = 3
+copro_init_temperature = 1.0
+
+gepa_auto = "light"
+
+max_instruction_words = 200

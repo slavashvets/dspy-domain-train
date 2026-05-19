@@ -1,10 +1,3 @@
-Classify the domains:
-- restaurant
-- attraction
-- hotel
-- taxi
-- train
-- bus
-- hospital
-- police
-- none
+Classify which domains are active in the current user turn.
+Return one or more from: restaurant, attraction, hotel, taxi, train, bus, hospital, police.
+Use "none" only when no domain is active.

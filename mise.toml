@@ -10,15 +10,19 @@ description = "Install locked project dependencies"
 run = "uv sync --locked --group dev"
 
 [tasks.dev]
-description = "Run GEPA optimization"
+description = "Run GEPA optimization (full dataset)"
 run = "LITELLM_LOG=ERROR uv run --locked dspy-domain-train"
+
+[tasks.demo]
+description = "Run GEPA optimization (small sample, smoke-test the flow)"
+run = "LITELLM_LOG=ERROR DSPY_PROFILE=demo uv run --locked dspy-domain-train"
 
 [tasks.lint]
 description = "Run linters"
 run = [
   "uv run --locked --group dev ruff check .",
   "uv run --locked --group dev ruff format --check .",
-  "uv run --locked --group dev mypy .",
+  "uv run --locked --group dev mypy src tests",
 ]
 
 [tasks.format]
@@ -29,12 +33,16 @@ run = "uv run --locked --group dev ruff format ."
 description = "Run unit tests"
 run = "LITELLM_LOG=ERROR uv run --locked python -m unittest discover -s tests"
 
+[tasks.convert-data]
+description = "Download MultiWOZ 2.4 and convert to train/dev/test JSON"
+run = "uv run --script scripts/convert_multiwoz.py"
+
 [tasks.check]
 description = "Run all local checks"
 run = [
   "uv run --locked --group dev ruff check .",
   "uv run --locked --group dev ruff format --check .",
-  "uv run --locked --group dev mypy .",
+  "uv run --locked --group dev mypy src tests",
   "LITELLM_LOG=ERROR uv run --locked python -m unittest discover -s tests",
   "uv run --locked python -m compileall -q src tests",
 ]

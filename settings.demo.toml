@@ -1,0 +1,6 @@
+max_train = 50
+max_dev = 30
+max_test = 30
+num_threads = 2
+copro_breadth = 4
+copro_depth = 2
