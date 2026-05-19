@@ -12,8 +12,7 @@ htmlcov/
 .venv
 
 # Local environment files
-.env
-.env.bak
+.env*
 settings.local.toml
 
 # Tool caches
