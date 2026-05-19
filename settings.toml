@@ -3,14 +3,20 @@ dev_path = "data/dev.json"
 test_path = "data/test.json"
 prompt_path = "prompts/p0.txt"
 
-optimizer = "copro"
+optimizer = "simba"
 num_threads = 4
 seed = 42
-
-copro_breadth = 10
-copro_depth = 3
-copro_init_temperature = 1.0
-
-gepa_auto = "light"
-
 max_instruction_words = 200
+
+[copro]
+breadth = 10
+depth = 3
+init_temperature = 1.0
+
+[simba]
+max_steps = 6
+bsize = 32
+num_candidates = 6
+
+[gepa]
+auto = "light"

@@ -56,19 +56,13 @@ def _domain_from_slot(slot_name: str) -> str | None:
 def extract_turn_domains(frames: dict) -> list[str]:
     """Extract active domains from user turn frames."""
     domains: set[str] = set()
-
-    services = frames.get("service", [])
     states = frames.get("state", [])
 
     for i, state in enumerate(states):
-        service = services[i] if i < len(services) else None
-
         intent = state.get("active_intent", "")
         domain = _domain_from_intent(intent)
         if domain:
             domains.add(domain)
-        elif service and service.lower() in VALID_DOMAINS:
-            domains.add(service.lower())
 
         for slot in state.get("requested_slots", []):
             d = _domain_from_slot(slot)

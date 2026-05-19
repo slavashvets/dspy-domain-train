@@ -12,6 +12,7 @@ from .training import (
     load_examples,
     optimize_copro,
     optimize_gepa,
+    optimize_simba,
     select_best_candidate,
 )
 
@@ -38,10 +39,22 @@ def main() -> None:
             metric=domain_metric,
             initial_instructions=p0,
             prompt_model=lm_refine,
-            breadth=settings.copro_breadth,
-            depth=settings.copro_depth,
-            init_temperature=settings.copro_init_temperature,
+            breadth=settings.copro.breadth,
+            depth=settings.copro.depth,
+            init_temperature=settings.copro.init_temperature,
             num_threads=settings.num_threads,
+        )
+    elif settings.optimizer == "simba":
+        optimized = optimize_simba(
+            trainset=trainset,
+            metric=domain_metric,
+            initial_instructions=p0,
+            prompt_model=lm_refine,
+            max_steps=settings.simba.max_steps,
+            bsize=settings.simba.bsize,
+            num_candidates=settings.simba.num_candidates,
+            num_threads=settings.num_threads,
+            seed=settings.seed,
         )
     else:
         optimized = optimize_gepa(
@@ -50,7 +63,7 @@ def main() -> None:
             metric=domain_metric,
             initial_instructions=p0,
             reflection_lm=lm_refine,
-            gepa_auto=settings.gepa_auto,
+            gepa_auto=settings.gepa.auto,
             num_threads=settings.num_threads,
             log_dir=str(run_dir / "gepa"),
         )

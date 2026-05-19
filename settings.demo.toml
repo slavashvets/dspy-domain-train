@@ -2,5 +2,12 @@ max_train = 50
 max_dev = 30
 max_test = 30
 num_threads = 2
-copro_breadth = 4
-copro_depth = 2
+
+[copro]
+breadth = 4
+depth = 2
+
+[simba]
+max_steps = 3
+bsize = 30
+num_candidates = 4

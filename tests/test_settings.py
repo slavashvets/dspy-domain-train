@@ -14,9 +14,11 @@ train_path = "data/train.json"
 dev_path = "data/dev.json"
 test_path = "data/test.json"
 prompt_path = "prompts/p0.txt"
-gepa_auto = "light"
 num_threads = 4
 seed = 42
+
+[gepa]
+auto = "light"
 """
 
 LOCAL_TOML = """
@@ -74,7 +76,7 @@ class SettingsTomlTests(unittest.TestCase):
 
         settings = Settings()  # type: ignore[call-arg]
 
-        self.assertEqual(settings.gepa_auto, "light")
+        self.assertEqual(settings.gepa.auto, "light")
         self.assertEqual(settings.num_threads, 4)
         self.assertEqual(settings.eval.deployment, "eval-deployment")
         self.assertEqual(settings.refine.max_tokens, 16000)

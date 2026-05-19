@@ -143,6 +143,34 @@ def optimize_gepa(
     )
 
 
+def optimize_simba(
+    trainset: list[dspy.Example],
+    metric: Callable,
+    initial_instructions: str,
+    prompt_model: dspy.LM,
+    max_steps: int = 6,
+    bsize: int = 32,
+    num_candidates: int = 6,
+    num_threads: int = 4,
+    seed: int = 0,
+) -> dspy.Module:
+    from .domain_task import DomainClassifier
+
+    student = DomainClassifier(instructions=initial_instructions)
+
+    optimizer = dspy.SIMBA(
+        metric=metric,
+        prompt_model=prompt_model,
+        max_demos=0,
+        max_steps=max_steps,
+        bsize=bsize,
+        num_candidates=num_candidates,
+        num_threads=num_threads,
+    )
+
+    return optimizer.compile(student, trainset=trainset, seed=seed)
+
+
 def get_instructions(program: dspy.Module) -> str:
     predictor = getattr(program, "predict", None)
     if predictor is None:
