@@ -10,7 +10,7 @@ description = "Install locked project dependencies"
 run = "uv sync --locked --group dev"
 
 [tasks.dev]
-description = "Run offline SRP once"
+description = "Run GEPA optimization"
 run = "LITELLM_LOG=ERROR uv run --locked dspy-domain-train"
 
 [tasks.lint]

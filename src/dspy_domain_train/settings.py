@@ -63,13 +63,11 @@ class Settings(BaseSettings):
     devset_path: ConfigPath
     prompt_path: ConfigPath
 
-    max_iters: int = 6
-    tol: float = 5e-3
-    refiner_candidates: int = 5
-    refiner_retries: int = 1
-    instr_max_len: int = 50
+    gepa_auto: Literal["light", "medium", "heavy"] = "light"
+    num_threads: int = 4
+    val_ratio: float = Field(default=0.2, gt=0.0, lt=1.0)
+    seed: int = 42
 
 
 def get_settings() -> Settings:
-    # Required nested settings are populated from environment variables at runtime.
     return Settings()  # type: ignore[call-arg]

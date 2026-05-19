@@ -2,137 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from dspy.utils.callback import BaseCallback
-
-
-class ConsoleProgress(BaseCallback):
-    """Lightweight progress tracker for LM calls.
-
-    Counts LM invocations and prints token usage when available. Resilient to
-    nested output structures such as dicts and lists.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.calls = 0
-        self.total_prompt = 0
-        self.total_completion = 0
-        self.total = 0
-
-    # LM-level
-    def on_lm_start(self, call_id: str, instance: Any, inputs: dict[str, Any]) -> None:
-        self.calls += 1
-        print(f"[{self.calls}] ...", flush=True)
-
-    def on_lm_end(
-        self,
-        call_id: str,
-        outputs: Any = None,
-        exception: Exception | None = None,
-    ) -> None:
-        # Callbacks must never fail; log only.
-        try:
-            if exception:
-                print(f"[LM {self.calls}] error: {exception}", flush=True)
-                return
-
-            tokens = self._extract_usage_totals(outputs)
-            if tokens is None:
-                # Usage unavailable; mark completion.
-                print(f"[LM {self.calls}] ok", flush=True)
-                return
-
-            pt, ct, tt = tokens
-            self.total_prompt += pt
-            self.total_completion += ct
-            self.total += tt
-            usage_summary = (
-                f"sum={self.total} | in={self.total_prompt} "
-                f"| out={self.total_completion}"
-            )
-            print(
-                f"[LM {self.calls}] +{tt} tok ({usage_summary})",
-                flush=True,
-            )
-        except Exception as e:
-            print(f"[LM {self.calls}] (usage unavailable: {e})", flush=True)
-
-    # --- helpers ---------------------------------------------------------
-
-    @staticmethod
-    def _extract_usage_totals(outputs: Any) -> tuple[int, int, int] | None:
-        """Extract usage totals from arbitrary outputs.
-
-        Returns (prompt_tokens, completion_tokens, total_tokens) or None.
-        """
-        if outputs is None:
-            return None
-
-        usage_dicts: list[dict[str, Any]] = []
-
-        def visit(o: Any) -> None:
-            if isinstance(o, dict):
-                # Prefer explicit containers like 'usage' or 'token_usage'.
-                for k in ("usage", "token_usage"):
-                    v = o.get(k)
-                    if isinstance(v, dict):
-                        usage_dicts.append(v)
-
-                # Fallback: the dict already looks like a usage payload.
-                keys = set(o.keys())
-                if keys & {
-                    "prompt_tokens",
-                    "input_tokens",
-                    "prompt",
-                    "completion_tokens",
-                    "output_tokens",
-                    "completion",
-                    "total_tokens",
-                }:
-                    usage_dicts.append(o)
-
-                for v in o.values():
-                    visit(v)
-            elif isinstance(o, (list, tuple)):
-                for item in o:
-                    visit(item)
-
-        visit(outputs)
-
-        if not usage_dicts:
-            return None
-
-        # Sum everything we found, avoiding duplicates by id().
-        seen: set[int] = set()
-        p_sum = c_sum = t_sum = 0
-
-        def as_int(x: Any) -> int:
-            try:
-                return int(x)
-            except Exception:
-                return 0
-
-        for u in usage_dicts:
-            uid = id(u)
-            if uid in seen:
-                continue
-            seen.add(uid)
-
-            pt = u.get("prompt_tokens") or u.get("input_tokens") or u.get("prompt") or 0
-            ct = (
-                u.get("completion_tokens")
-                or u.get("output_tokens")
-                or u.get("completion")
-                or 0
-            )
-            tt = u.get("total_tokens") or (pt or 0) + (ct or 0)
-
-            p_sum += as_int(pt)
-            c_sum += as_int(ct)
-            t_sum += as_int(tt)
-
-        return p_sum, c_sum, t_sum
-
 
 def add_usage(u_total: dict, u: Any) -> None:
     """Accumulate usage emitted by Prediction.get_lm_usage().
@@ -168,15 +37,12 @@ def add_usage(u_total: dict, u: Any) -> None:
         except Exception:
             pass
 
-    # List of records.
     if isinstance(u, list):
         for item in u:
             add_usage(u_total, item)
         return
 
-    # Explicit mapping {lm_name: stats}.
     if isinstance(u, dict):
-        # Case 1: {lm_name: {usage...}}.
         if (
             all(isinstance(v, dict) for v in u.values())
             and any(
@@ -199,7 +65,6 @@ def add_usage(u_total: dict, u: Any) -> None:
                     _acc(str(lm_name), stats)
             return
 
-        # Case 2: {'usage': {...}, 'model': '...'}.
         stats = None
         if isinstance(u.get("usage"), dict):
             stats = u["usage"]
@@ -210,7 +75,6 @@ def add_usage(u_total: dict, u: Any) -> None:
             _acc(name, stats)
             return
 
-        # Case 3: flat usage dictionary.
         if {
             "prompt_tokens",
             "input_tokens",
@@ -223,8 +87,6 @@ def add_usage(u_total: dict, u: Any) -> None:
             name = str(u.get("model") or u.get("lm") or u.get("name") or "lm")
             _acc(name, u)
             return
-
-    # Otherwise the structure is unknown; skip.
 
 
 def format_usage(u_total: dict) -> str:

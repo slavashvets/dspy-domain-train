@@ -1,7 +1,6 @@
 devset_path = "data/dev.json"
 prompt_path = "prompts/p0.txt"
-max_iters = 6
-tol = 0.005
-refiner_candidates = 5
-refiner_retries = 1
-instr_max_len = 50
+gepa_auto = "light"
+num_threads = 4
+val_ratio = 0.2
+seed = 42

@@ -1,7 +1,7 @@
 [project]
 name = "dspy-domain-train"
 version = "0.1.0"
-description = "Offline DSPy self-refinement loop for multilabel domain classification"
+description = "DSPy GEPA-optimized multilabel domain classifier"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
 dependencies = [

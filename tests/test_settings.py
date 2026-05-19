@@ -12,11 +12,10 @@ from dspy_domain_train.toml import config_dir
 BASE_TOML = """
 devset_path = "data/dev.json"
 prompt_path = "prompts/p0.txt"
-max_iters = 2
-tol = 0.01
-refiner_candidates = 3
-refiner_retries = 2
-instr_max_len = 40
+gepa_auto = "light"
+num_threads = 4
+val_ratio = 0.2
+seed = 42
 """
 
 LOCAL_TOML = """
@@ -74,8 +73,8 @@ class SettingsTomlTests(unittest.TestCase):
 
         settings = Settings()  # type: ignore[call-arg]
 
-        self.assertEqual(settings.max_iters, 2)
-        self.assertEqual(settings.refiner_retries, 2)
+        self.assertEqual(settings.gepa_auto, "light")
+        self.assertEqual(settings.num_threads, 4)
         self.assertEqual(settings.eval.deployment, "eval-deployment")
         self.assertEqual(settings.refine.max_tokens, 16000)
         self.assertEqual(settings.eval.api_key.get_secret_value(), "eval-secret")
@@ -84,12 +83,12 @@ class SettingsTomlTests(unittest.TestCase):
 
     def test_env_overrides_toml(self) -> None:
         self.write_settings()
-        os.environ["DSPY_MAX_ITERS"] = "9"
+        os.environ["DSPY_NUM_THREADS"] = "8"
         os.environ["DSPY_EVAL__DEPLOYMENT"] = "env-deployment"
 
         settings = Settings()  # type: ignore[call-arg]
 
-        self.assertEqual(settings.max_iters, 9)
+        self.assertEqual(settings.num_threads, 8)
         self.assertEqual(settings.eval.deployment, "env-deployment")
 
     def test_rejects_unknown_toml_keys(self) -> None:

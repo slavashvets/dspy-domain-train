@@ -25,6 +25,9 @@ settings.local.toml
 # Local task/agent state
 .beads/
 
+# Optimization run artifacts
+runs/
+
 # Other local files
 .DS_Store
 log*.txt
