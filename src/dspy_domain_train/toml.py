@@ -16,8 +16,11 @@ def find_toml(name: str, start: Path | None = None) -> list[str]:
 
 
 def settings_toml_files(profile: str) -> list[str]:
-    """Return base settings plus an optional profile overlay."""
-    return [*find_toml("settings.toml"), *find_toml(f"settings.{profile}.toml")]
+    """Return base settings, local secrets, and an optional profile overlay."""
+    files = [*find_toml("settings.toml"), *find_toml("settings.local.toml")]
+    if profile != "local":
+        files.extend(find_toml(f"settings.{profile}.toml"))
+    return files
 
 
 @cache
