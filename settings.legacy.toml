@@ -1,0 +1,5 @@
+train_path = "data/legacy_train.json"
+dev_path = "data/legacy_dev.json"
+test_path = "data/legacy_test.json"
+copro_breadth = 6
+copro_depth = 3
