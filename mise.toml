@@ -9,13 +9,33 @@ python.uv_venv_auto = true
 description = "Install locked project dependencies"
 run = "uv sync --locked --group dev"
 
-[tasks.dev]
-description = "Run GEPA optimization (full dataset)"
-run = "LITELLM_LOG=ERROR uv run --locked dspy-domain-train"
+# --- Optimizer tasks ---
 
-[tasks.demo]
-description = "Run GEPA optimization (small sample, smoke-test the flow)"
-run = "LITELLM_LOG=ERROR DSPY_PROFILE=demo uv run --locked dspy-domain-train"
+[tasks.copro]
+description = "Run COPRO optimizer (full dataset)"
+run = "LITELLM_LOG=ERROR DSPY_OPTIMIZER=copro uv run --locked dspy-domain-train"
+
+[tasks.simba]
+description = "Run SIMBA optimizer (full dataset)"
+run = "LITELLM_LOG=ERROR DSPY_OPTIMIZER=simba uv run --locked dspy-domain-train"
+
+[tasks.gepa]
+description = "Run GEPA optimizer (full dataset)"
+run = "LITELLM_LOG=ERROR DSPY_OPTIMIZER=gepa uv run --locked dspy-domain-train"
+
+[tasks."copro:demo"]
+description = "COPRO on small sample (smoke-test)"
+run = "LITELLM_LOG=ERROR DSPY_PROFILE=demo DSPY_OPTIMIZER=copro uv run --locked dspy-domain-train"
+
+[tasks."simba:demo"]
+description = "SIMBA on small sample (smoke-test)"
+run = "LITELLM_LOG=ERROR DSPY_PROFILE=demo DSPY_OPTIMIZER=simba uv run --locked dspy-domain-train"
+
+[tasks."gepa:demo"]
+description = "GEPA on small sample (smoke-test)"
+run = "LITELLM_LOG=ERROR DSPY_PROFILE=demo DSPY_OPTIMIZER=gepa uv run --locked dspy-domain-train"
+
+# --- Dev tools ---
 
 [tasks.lint]
 description = "Run linters"
@@ -34,7 +54,7 @@ description = "Run unit tests"
 run = "LITELLM_LOG=ERROR uv run --locked python -m unittest discover -s tests"
 
 [tasks.convert-data]
-description = "Download MultiWOZ 2.4 and convert to train/dev/test JSON"
+description = "Download MultiWOZ 2.2 and convert to train/dev/test JSON"
 run = "uv run --script scripts/convert_multiwoz.py"
 
 [tasks.check]
