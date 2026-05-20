@@ -1,7 +1,4 @@
-import json
-import re
 from collections.abc import Sequence
-from pathlib import Path
 from typing import Literal, get_args
 
 import dspy
@@ -19,89 +16,61 @@ Domain = Literal[
 ]
 
 DOMAINS: tuple[str, ...] = get_args(Domain)
+DOMAIN_SET = frozenset(DOMAINS)
 
 
 class DomainClassificationSig(dspy.Signature):
-    """Classify the active service domains in the current user turn."""
+    """Classify the active service domains in the current user turn.
+
+    Return one or more from: restaurant, attraction, hotel, taxi, train, bus,
+    hospital, police. Use "none" only when no domain is active.
+
+    Do not add a domain just because a named place belongs to that category.
+    In taxi requests, pickup/dropoff locations are taxi slot values, not
+    additional active domains.
+    """
 
     dialogue_context: str = dspy.InputField(desc="Previous dialogue context, if any.")
     turn: str = dspy.InputField(desc="Current user turn.")
     domains: list[Domain] = dspy.OutputField(
-        desc=(
-            "Active domains requested in the current turn."
-            " Use 'none' only when no domain is active."
-        )
+        desc="Active domains requested in the current turn."
     )
 
 
 class DomainClassifier(dspy.Module):
     def __init__(self, instructions: str | None = None) -> None:
         super().__init__()
-        sig = (
+        signature = (
             DomainClassificationSig.with_instructions(instructions)
             if instructions
             else DomainClassificationSig
         )
-        self.predict = dspy.Predict(sig)
+        self.predict = dspy.Predict(signature)
 
     def forward(self, dialogue_context: str, turn: str) -> dspy.Prediction:
         return self.predict(dialogue_context=dialogue_context, turn=turn)
 
 
-def load_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8").strip()
+def normalize_gold(labels: Sequence[str]) -> list[str]:
+    cleaned = [
+        label
+        for label in dict.fromkeys(str(item).lower().strip() for item in labels)
+        if label in DOMAIN_SET
+    ]
+    if "none" in cleaned and len(cleaned) > 1:
+        cleaned = [label for label in cleaned if label != "none"]
+    return cleaned or ["none"]
 
 
-def dedup(seq: Sequence[str]) -> list[str]:
-    seen: set[str] = set()
-    out: list[str] = []
-    for s in seq:
-        if s not in seen:
-            seen.add(s)
-            out.append(s)
-    return out
+def normalize_prediction(labels: Sequence[str]) -> list[str] | None:
+    cleaned = [str(item).lower().strip() for item in labels]
+    if any(label not in DOMAIN_SET for label in cleaned):
+        return None
 
-
-def normalize_domains(raw: list[str] | tuple[str, ...]) -> list[str]:
-    allowed = set(DOMAINS)
-    filtered = dedup([d.lower().strip() for d in raw if d.lower().strip() in allowed])
-    if "none" in filtered and len(filtered) > 1:
-        filtered = [d for d in filtered if d != "none"]
-    return filtered or ["none"]
-
-
-def parse_prediction(pred: dspy.Prediction) -> list[str]:
-    raw_domains = getattr(pred, "domains", None)
-    if raw_domains:
-        if not isinstance(raw_domains, (list, tuple)):
-            raw_domains = [raw_domains]
-        return normalize_domains(raw_domains)
-
-    # Legacy path: JSON string fallback for older checkpoints
-    raw_str = getattr(pred, "domains_json", "") or ""
-    return _parse_domains_from_str(raw_str)
-
-
-def _parse_domains_from_str(raw: str) -> list[str]:
-    """Parse model output into a clean list of allowed domains."""
-
-    def try_load(s: str) -> list[str]:
-        try:
-            obj = json.loads(s.strip())
-            val = obj.get("domains", [])
-            if not isinstance(val, list):
-                return []
-            return [str(v).lower().strip() for v in val]
-        except Exception:
-            return []
-
-    domains = try_load(raw)
-    if not domains:
-        m = re.search(r"\{.*\}", raw, flags=re.DOTALL)
-        if m:
-            domains = try_load(m.group(0))
-
-    return normalize_domains(domains) if domains else ["none"]
+    deduped = list(dict.fromkeys(cleaned))
+    if "none" in deduped and len(deduped) > 1:
+        deduped = [label for label in deduped if label != "none"]
+    return deduped or ["none"]
 
 
 def domain_metric(
@@ -111,24 +80,27 @@ def domain_metric(
     pred_name: str | None = None,
     pred_trace=None,  # noqa: ANN001
 ) -> float | dspy.Prediction:
-    y_true = set(normalize_domains(example.domains))
-    y_pred = set(parse_prediction(pred))
+    y_true = set(normalize_gold(example.domains))
+    y_pred_list = normalize_prediction(getattr(pred, "domains", []))
 
-    missing = sorted(y_true - y_pred)
-    extra = sorted(y_pred - y_true)
-    score = float(not missing and not extra)
+    if y_pred_list is None:
+        score = 0.0
+        missing = sorted(y_true)
+        extra = ["<invalid-label>"]
+    else:
+        y_pred = set(y_pred_list)
+        missing = sorted(y_true - y_pred)
+        extra = sorted(y_pred - y_true)
+        score = float(not missing and not extra)
 
     if pred_name is None:
         return score
 
-    feedback_parts = []
-    if missing:
-        feedback_parts.append(f"Missing: {missing}.")
-    if extra:
-        feedback_parts.append(f"Extra: {extra}.")
-    if not feedback_parts:
-        feedback_parts.append("Correct.")
-
-    ctx = f"Turn: {example.turn}"
-    feedback = f"{ctx} | {' '.join(feedback_parts)}"
+    feedback = (
+        f"Context: {example.dialogue_context!r} | "
+        f"Turn: {example.turn!r} | "
+        f"Gold: {sorted(y_true)} | "
+        f"Predicted: {y_pred_list if y_pred_list is not None else '<invalid>'} | "
+        f"Missing: {missing} | Extra: {extra}"
+    )
     return dspy.Prediction(score=score, feedback=feedback)
