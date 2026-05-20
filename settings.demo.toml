@@ -11,3 +11,8 @@ depth = 2
 max_steps = 3
 bsize = 30
 num_candidates = 4
+
+[srp]
+max_iters = 3
+patience = 2
+max_error_cases = 8

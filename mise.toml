@@ -11,6 +11,10 @@ run = "uv sync --locked --group dev"
 
 # --- Optimizer tasks ---
 
+[tasks.srp]
+description = "Run SRP optimizer (full dataset)"
+run = "LITELLM_LOG=ERROR DSPY_OPTIMIZER=srp uv run --locked dspy-domain-train"
+
 [tasks.copro]
 description = "Run COPRO optimizer (full dataset)"
 run = "LITELLM_LOG=ERROR DSPY_OPTIMIZER=copro uv run --locked dspy-domain-train"
@@ -22,6 +26,10 @@ run = "LITELLM_LOG=ERROR DSPY_OPTIMIZER=simba uv run --locked dspy-domain-train"
 [tasks.gepa]
 description = "Run GEPA optimizer (full dataset)"
 run = "LITELLM_LOG=ERROR DSPY_OPTIMIZER=gepa uv run --locked dspy-domain-train"
+
+[tasks."srp:demo"]
+description = "SRP on small sample (smoke-test)"
+run = "LITELLM_LOG=ERROR DSPY_PROFILE=demo DSPY_OPTIMIZER=srp uv run --locked dspy-domain-train"
 
 [tasks."copro:demo"]
 description = "COPRO on small sample (smoke-test)"

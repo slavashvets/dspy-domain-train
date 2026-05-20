@@ -1,12 +1,10 @@
 train_path = "data/train.json"
 dev_path = "data/dev.json"
 test_path = "data/test.json"
-prompt_path = "prompts/p0.txt"
 
-optimizer = "simba"
+optimizer = "srp"
 num_threads = 4
 seed = 42
-max_instruction_words = 200
 
 [copro]
 breadth = 10
@@ -20,3 +18,8 @@ num_candidates = 6
 
 [gepa]
 auto = "light"
+
+[srp]
+max_iters = 6
+patience = 2
+max_error_cases = 12

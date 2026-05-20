@@ -1,13 +1,12 @@
 # dspy-domain-train
 
-Multilabel domain classifier optimized with [DSPy](https://dspy.ai/) GEPA and
+Multilabel domain classifier optimized with [DSPy](https://dspy.ai/) and
 Azure OpenAI.
 
-The application uses DSPy's GEPA optimizer to evolve classification instructions
-through reflective prompt optimization: a cheap task model classifies dialogue
-turns, while a stronger reflection model analyzes errors and proposes instruction
-mutations. The best instructions are selected via Pareto frontier on a validation
-split.
+The project includes a custom **SRP (Self-Reflective Prompting)** optimizer
+that iteratively appends concise rules to a predictor's instruction by
+analyzing error cases. It also supports DSPy's built-in GEPA for evolutionary
+instruction optimization.
 
 ## Requirements
 
@@ -32,8 +31,8 @@ Configuration is loaded from TOML files with pydantic-settings:
 cp settings.local.example.toml settings.local.toml
 ```
 
-`settings.toml` is the tracked base configuration: runtime knobs, prompt/data
-paths, and shared defaults. `settings.local.toml` is ignored by git and contains
+`settings.toml` is the tracked base configuration: runtime knobs, data paths,
+and shared defaults. `settings.local.toml` is ignored by git and contains
 local Azure OpenAI endpoints, API keys, deployments, and model-specific details.
 
 The default profile is `local`, so the loader deep-merges:
@@ -54,12 +53,14 @@ or `responses`).
 ## Commands
 
 ```bash
-mise run dev      # run GEPA optimization loop
-# or: uv run --locked dspy-domain-train
-mise run format   # format Python files with Ruff
-mise run lint     # run Ruff and mypy
-mise run test     # run unit tests that do not call Azure
-mise run check    # run all static checks plus compileall
+mise run srp       # run SRP optimization loop (default)
+mise run gepa      # run GEPA optimization loop
+mise run srp:demo  # SRP on small sample (smoke-test)
+mise run gepa:demo # GEPA on small sample (smoke-test)
+mise run format    # format Python files with Ruff
+mise run lint      # run Ruff and mypy
+mise run test      # run unit tests that do not call Azure
+mise run check     # run all static checks plus compileall
 ```
 
 ## Data Format
@@ -77,55 +78,31 @@ mise run check    # run all static checks plus compileall
 Allowed labels are `restaurant`, `attraction`, `hotel`, `taxi`, `train`, `bus`,
 `hospital`, `police`, and `none`.
 
-## DSPy Optimizer Cheat Sheet
+## SRP Optimizer
 
-DSPy optimizers tune two knobs: **instructions** (task description text) and
-**demos** (few-shot examples baked into the prompt).
+SRP (Self-Reflective Prompting) is a custom DSPy `Teleprompter` that:
 
-| Optimizer | Optimizes | Mechanism |
-|-----------|-----------|-----------|
-| BootstrapFewShot | demos only | Teacher solves examples, successful traces become few-shot demos |
-| COPRO | instructions only | Generate N instruction variants, score each, pick the best |
-| MIPROv2 | instructions + demos | Bootstrap demos + generate instruction candidates + Bayesian search over combinations |
-| GEPA | instructions only | Evolutionary: error traces + textual feedback → LLM mutates instructions → Pareto frontier selection |
-| SIMBA | instructions + demos | Finds unstable examples, generates targeted rules or adds demos for failure cases |
+1. Evaluates the current program on a working set
+2. Collects error cases (inputs, gold, prediction, feedback)
+3. Uses a refiner LM to propose 1-3 concise rules addressing those errors
+4. Appends rules to the predictor instruction
+5. Accepts the candidate if score improves, otherwise increments patience counter
+6. Stops on perfect score, patience exhaustion, or max iterations
 
-### When to use what
+```python
+from dspy_domain_train.srp import SRP
 
-| Scenario | Pick | Why |
-|----------|------|-----|
-| Few examples (10-50) | BootstrapFewShot | Demos help most when data is scarce |
-| Medium dataset (50-500) | MIPROv2 `auto="light"` | Enough data for Bayesian search without heavy budget |
-| Large dataset (500+) | MIPROv2 `auto="heavy"` | Full search pays off |
-| Minimal token budget for optimization | BootstrapFewShot or COPRO | Fewest LLM calls (~70-200) |
-| Final prompt must be short (no demos) | GEPA or COPRO | Only rewrite instructions, don't inflate prompt with examples |
-| Best result, cost doesn't matter | MIPROv2 heavy, then GEPA on top | Joint optimization of everything |
-| Classification / structured output | BootstrapFewShot → MIPROv2 | Demos strongly help classifiers |
-| Intent detection / production runtime | GEPA | Short prompt with precise rules, no demo overhead per call |
-| Agents / multi-step / ReAct | SIMBA | Designed for unstable long pipelines |
-| Subtle edge-case errors | GEPA | Reflection on failures catches nuanced patterns |
-| Prompt already decent, squeezing last % | GEPA or SIMBA | Focus on failure cases, not broad exploration |
-| Need something in 5 minutes | COPRO | One round: generate variants → pick winner |
-
-### Resource comparison
-
-| | BootstrapFewShot | COPRO | MIPROv2 light | MIPROv2 heavy | GEPA | SIMBA |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| LLM calls | ~70-150 | ~100-200 | ~200-400 | ~1000+ | ~300-600 | ~500-1000 |
-| Min examples | 10 | 20 | 50 | 200+ | 20 | 32 |
-| Needs teacher LM | yes | no | optional | optional | no | no |
-| Needs strong reflector LM | no | no | no | no | yes | no |
-| Makes prompt longer | yes (demos) | no | yes (demos) | yes (demos) | no | slightly |
-
-### Quick decision tree
-
+optimizer = SRP(
+    metric=domain_metric,
+    prompt_model=refine_lm,
+    max_iters=6,
+    patience=2,
+    max_error_cases=12,
+    num_threads=4,
+)
+optimized = optimizer.compile(student, trainset=trainset, valset=valset)
 ```
-Need short production prompt (no demos)?
-├─ Yes → GEPA (or COPRO if budget is tight)
-└─ No, prompt size is fine
-   ├─ < 50 examples → BootstrapFewShot
-   └─ 50+ examples
-      ├─ Prompt works OK, need to fix edge cases → GEPA
-      ├─ Unstable results across runs → SIMBA
-      └─ Starting fresh or want full optimization → MIPROv2
-```
+
+The returned module carries `candidate_programs` (chronological list with
+iteration, score, rules, accepted) and `trial_logs` (best_score,
+stopped_reason).

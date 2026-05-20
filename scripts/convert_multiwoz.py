@@ -9,8 +9,8 @@
 Output format:
   {"turn": "...", "dialogue_context": "...", "domains": ["hotel", ...]}
 
-Per-turn domain labels derived from MultiWOZ 2.2 frame annotations:
-active_intent and requested_slots (added in 2.2, ground-truth per-turn).
+Per-turn domain labels derived from MultiWOZ 2.2 frame annotations
+(active_intent and requested_slots) plus skip/closing heuristic.
 """
 
 import json
@@ -41,9 +41,6 @@ def _domain_from_intent(intent: str) -> str | None:
     for part in parts:
         if part in VALID_DOMAINS:
             return part
-    for part in parts[1:]:
-        if part in VALID_DOMAINS:
-            return part
     return None
 
 
@@ -58,7 +55,7 @@ def extract_turn_domains(frames: dict) -> list[str]:
     domains: set[str] = set()
     states = frames.get("state", [])
 
-    for i, state in enumerate(states):
+    for state in states:
         intent = state.get("active_intent", "")
         domain = _domain_from_intent(intent)
         if domain:

@@ -1,7 +1,7 @@
 [project]
 name = "dspy-domain-train"
 version = "0.1.0"
-description = "DSPy GEPA-optimized multilabel domain classifier"
+description = "DSPy domain classifier with SRP and GEPA optimizers"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
 dependencies = [
