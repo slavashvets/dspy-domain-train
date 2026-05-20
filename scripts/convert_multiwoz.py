@@ -82,6 +82,7 @@ def convert_dialogue(dialogue: dict, max_context: int = 4) -> list[dict]:
     for i in range(len(utterances)):
         utt = utterances[i].strip()
         is_user = speakers[i] == 0
+        prefix = "USER" if is_user else "SYSTEM"
 
         if is_user:
             frames = all_frames[i]
@@ -91,8 +92,7 @@ def convert_dialogue(dialogue: dict, max_context: int = 4) -> list[dict]:
                 if _CLOSING_RE.match(utt):
                     domains = ["none"]
                 else:
-                    # Ambiguous follow-up, skip
-                    history.append(utt)
+                    history.append(f"{prefix}: {utt}")
                     continue
 
             context = " | ".join(history[-max_context:]) if history else ""
@@ -104,7 +104,7 @@ def convert_dialogue(dialogue: dict, max_context: int = 4) -> list[dict]:
                 }
             )
 
-        history.append(utt)
+        history.append(f"{prefix}: {utt}")
 
     return examples
 
@@ -128,7 +128,14 @@ def main() -> None:
 
         out_path = OUTPUT_DIR / filename
         out_path.write_text(json.dumps(examples, indent=2, ensure_ascii=False) + "\n")
+
+        label_counts: dict[str, int] = {}
+        for ex in examples:
+            for domain in ex["domains"]:
+                label_counts[domain] = label_counts.get(domain, 0) + 1
+        dist = ", ".join(f"{k}={v}" for k, v in sorted(label_counts.items()))
         print(f"  {split_name} -> {out_path} ({len(examples)} examples)")
+        print(f"    labels: {dist}")
 
     print("Done.")
 
