@@ -38,39 +38,45 @@ class DomainClassificationSig(dspy.Signature):
 
 
 class DomainClassifier(dspy.Module):
-    def __init__(self, instructions: str | None = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        signature = (
-            DomainClassificationSig.with_instructions(instructions)
-            if instructions
-            else DomainClassificationSig
-        )
-        self.predict = dspy.Predict(signature)
+        self.predict = dspy.Predict(DomainClassificationSig)
 
     def forward(self, dialogue_context: str, turn: str) -> dspy.Prediction:
         return self.predict(dialogue_context=dialogue_context, turn=turn)
 
 
-def normalize_gold(labels: Sequence[str]) -> list[str]:
-    cleaned = [
-        label
-        for label in dict.fromkeys(str(item).lower().strip() for item in labels)
-        if label in DOMAIN_SET
-    ]
-    if "none" in cleaned and len(cleaned) > 1:
-        cleaned = [label for label in cleaned if label != "none"]
-    return cleaned or ["none"]
+def canonical_gold(labels: Sequence[str]) -> frozenset[str]:
+    values = frozenset(str(label).lower().strip() for label in labels)
+
+    if not values:
+        return frozenset({"none"})
+
+    unknown = values - DOMAIN_SET
+    if unknown:
+        raise ValueError(f"Invalid gold domain labels: {sorted(unknown)}")
+
+    if "none" in values and len(values) > 1:
+        raise ValueError(
+            f"Gold labels cannot mix 'none' with domains: {sorted(values)}"
+        )
+
+    return values
 
 
-def normalize_prediction(labels: Sequence[str]) -> list[str] | None:
-    cleaned = [str(item).lower().strip() for item in labels]
-    if any(label not in DOMAIN_SET for label in cleaned):
+def canonical_prediction(labels: Sequence[str]) -> frozenset[str] | None:
+    values = frozenset(str(label).lower().strip() for label in labels)
+
+    if not values:
+        return frozenset({"none"})
+
+    if values - DOMAIN_SET:
         return None
 
-    deduped = list(dict.fromkeys(cleaned))
-    if "none" in deduped and len(deduped) > 1:
-        deduped = [label for label in deduped if label != "none"]
-    return deduped or ["none"]
+    if "none" in values and len(values) > 1:
+        return None
+
+    return values
 
 
 def domain_metric(
@@ -80,18 +86,19 @@ def domain_metric(
     pred_name: str | None = None,
     pred_trace=None,  # noqa: ANN001
 ) -> float | dspy.Prediction:
-    y_true = set(normalize_gold(example.domains))
-    y_pred_list = normalize_prediction(getattr(pred, "domains", []))
+    y_true = canonical_gold(example.domains)
+    y_pred = canonical_prediction(getattr(pred, "domains", []))
 
-    if y_pred_list is None:
+    if y_pred is None:
         score = 0.0
         missing = sorted(y_true)
-        extra = ["<invalid-label>"]
+        extra = ["<invalid-output>"]
+        predicted: list[str] | str = "<invalid>"
     else:
-        y_pred = set(y_pred_list)
         missing = sorted(y_true - y_pred)
         extra = sorted(y_pred - y_true)
         score = float(not missing and not extra)
+        predicted = sorted(y_pred)
 
     if pred_name is None:
         return score
@@ -100,7 +107,7 @@ def domain_metric(
         f"Context: {example.dialogue_context!r} | "
         f"Turn: {example.turn!r} | "
         f"Gold: {sorted(y_true)} | "
-        f"Predicted: {y_pred_list if y_pred_list is not None else '<invalid>'} | "
+        f"Predicted: {predicted} | "
         f"Missing: {missing} | Extra: {extra}"
     )
     return dspy.Prediction(score=score, feedback=feedback)

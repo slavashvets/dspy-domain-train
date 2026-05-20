@@ -165,10 +165,4 @@ def optimize_srp(
 
 
 def get_instructions(program: dspy.Module) -> str:
-    predictor = getattr(program, "predict", None)
-    if predictor is None:
-        return ""
-    signature = getattr(predictor, "signature", None)
-    if signature is None:
-        return ""
-    return getattr(signature, "instructions", "") or ""
+    return program.predict.signature.instructions or ""

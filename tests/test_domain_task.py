@@ -3,42 +3,46 @@ import unittest
 import dspy
 
 from dspy_domain_train.domain_task import (
+    canonical_gold,
+    canonical_prediction,
     domain_metric,
-    normalize_gold,
-    normalize_prediction,
 )
 
 
-class NormalizeGoldTests(unittest.TestCase):
-    def test_deduplicates_and_lowercases(self) -> None:
-        result = normalize_gold(["Hotel", "HOTEL", "taxi"])
-        self.assertEqual(result, ["hotel", "taxi"])
-
-    def test_none_exclusive(self) -> None:
-        self.assertEqual(normalize_gold(["none", "hotel"]), ["hotel"])
+class CanonicalGoldTests(unittest.TestCase):
+    def test_lowercases_and_deduplicates(self) -> None:
+        result = canonical_gold(["Hotel", "HOTEL", "taxi"])
+        self.assertEqual(result, frozenset({"hotel", "taxi"}))
 
     def test_empty_returns_none(self) -> None:
-        self.assertEqual(normalize_gold([]), ["none"])
+        self.assertEqual(canonical_gold([]), frozenset({"none"}))
 
-    def test_filters_invalid_labels(self) -> None:
-        self.assertEqual(normalize_gold(["invalid", "bus"]), ["bus"])
+    def test_raises_on_invalid_label(self) -> None:
+        with self.assertRaises(ValueError, msg="Invalid gold domain labels"):
+            canonical_gold(["invalid", "bus"])
+
+    def test_raises_on_mixed_none(self) -> None:
+        with self.assertRaises(ValueError, msg="cannot mix 'none'"):
+            canonical_gold(["none", "hotel"])
 
 
-class NormalizePredictionTests(unittest.TestCase):
+class CanonicalPredictionTests(unittest.TestCase):
     def test_valid_labels(self) -> None:
-        self.assertEqual(normalize_prediction(["Hotel", "taxi"]), ["hotel", "taxi"])
+        self.assertEqual(
+            canonical_prediction(["Hotel", "taxi"]), frozenset({"hotel", "taxi"})
+        )
 
     def test_invalid_label_returns_none(self) -> None:
-        self.assertIsNone(normalize_prediction(["invalid", "hotel"]))
+        self.assertIsNone(canonical_prediction(["invalid", "hotel"]))
 
     def test_empty_returns_none_label(self) -> None:
-        self.assertEqual(normalize_prediction([]), ["none"])
+        self.assertEqual(canonical_prediction([]), frozenset({"none"}))
 
     def test_deduplicates(self) -> None:
-        self.assertEqual(normalize_prediction(["taxi", "Taxi"]), ["taxi"])
+        self.assertEqual(canonical_prediction(["taxi", "Taxi"]), frozenset({"taxi"}))
 
-    def test_none_exclusive(self) -> None:
-        self.assertEqual(normalize_prediction(["none", "hotel"]), ["hotel"])
+    def test_mixed_none_returns_none(self) -> None:
+        self.assertIsNone(canonical_prediction(["none", "hotel"]))
 
 
 class DomainMetricTests(unittest.TestCase):

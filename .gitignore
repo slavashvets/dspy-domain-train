@@ -25,6 +25,9 @@ settings.local.toml
 # Local task/agent state
 .beads/
 
+# Research notes (local only)
+notes/
+
 # Generated data (recreate via: mise run convert-data)
 data/*.json
 

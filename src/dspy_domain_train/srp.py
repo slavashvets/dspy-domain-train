@@ -46,7 +46,6 @@ class SRP(Teleprompter):
         patience: int = 2,
         max_examples: int | None = None,
         max_error_cases: int = 12,
-        min_delta: float = 0.0,
         num_threads: int | None = None,
         seed: int = 0,
         target_predictor: str | None = None,
@@ -67,11 +66,11 @@ class SRP(Teleprompter):
         self.patience = patience
         self.max_examples = max_examples
         self.max_error_cases = max_error_cases
-        self.min_delta = min_delta
         self.num_threads = num_threads
         self.seed = seed
         self.target_predictor = target_predictor
         self.display_progress = display_progress
+        self.refiner = dspy.Predict(SRPRefinerSig)
 
     def compile(
         self,
@@ -110,7 +109,6 @@ class SRP(Teleprompter):
             eval_kwargs=eval_kwargs,
         )
         best = current.deepcopy()
-        no_improvement = 0
 
         candidate_programs: list[dict[str, Any]] = [
             self._candidate_record(
@@ -122,7 +120,18 @@ class SRP(Teleprompter):
             )
         ]
 
-        stopped_reason = "perfect_score" if best_score >= 100.0 else "max_iters"
+        if best_score >= 100.0:
+            best.candidate_programs = candidate_programs
+            best.trial_logs = {
+                "best_score": best_score,
+                "stopped_reason": "perfect_score",
+                "max_iters": self.max_iters,
+                "patience": self.patience,
+            }
+            return best
+
+        no_improvement = 0
+        stopped_reason = "max_iters"
 
         for iteration in range(1, self.max_iters + 1):
             errors = self._collect_errors(current_results, predictor_name)
@@ -143,7 +152,7 @@ class SRP(Teleprompter):
                 eval_kwargs=eval_kwargs,
             )
 
-            accepted = candidate_score > best_score + self.min_delta
+            accepted = candidate_score > best_score
             candidate_programs.append(
                 self._candidate_record(
                     iteration=iteration,
@@ -227,9 +236,9 @@ class SRP(Teleprompter):
 
             errors.append(
                 SRPErrorCase(
-                    inputs=self._plain(example.inputs()),
-                    gold=self._plain(example.labels()),
-                    prediction=self._plain(prediction),
+                    inputs=dict(example.inputs()),
+                    gold=dict(example.labels()),
+                    prediction=dict(prediction),
                     score=score_value,
                     feedback=self._metric_feedback(example, prediction, predictor_name),
                 )
@@ -251,9 +260,10 @@ class SRP(Teleprompter):
             else nullcontext()
         )
         with context:
-            prediction = dspy.Predict(SRPRefinerSig)(
+            prediction = self.refiner(
                 current_instruction=current_instruction,
                 error_cases=errors,
+                config={"temperature": 1.0},
             )
 
         return self._clean_rules(getattr(prediction, "rules", []), current_instruction)
@@ -321,17 +331,13 @@ class SRP(Teleprompter):
         prediction: dspy.Prediction,
         predictor_name: str,
     ) -> str | None:
-        try:
-            feedback = self.metric(
-                example,
-                prediction,
-                pred_name=predictor_name,
-                pred_trace=None,
-            )
-        except TypeError:
-            return None
-
-        value = getattr(feedback, "feedback", None)
+        result = self.metric(
+            example,
+            prediction,
+            pred_name=predictor_name,
+            pred_trace=None,
+        )
+        value = getattr(result, "feedback", None)
         return str(value) if value else None
 
     @staticmethod
@@ -345,20 +351,6 @@ class SRP(Teleprompter):
         raise TypeError(
             f"Metric score must be numeric, bool, or have .score: {score!r}"
         )
-
-    @classmethod
-    def _plain(cls, value: Any) -> Any:
-        if value is None:
-            return None
-        if isinstance(value, BaseModel):
-            return value.model_dump()
-        if hasattr(value, "toDict"):
-            return cls._plain(value.toDict())
-        if hasattr(value, "items"):
-            return {str(key): cls._plain(item) for key, item in value.items()}
-        if isinstance(value, (list, tuple)):
-            return [cls._plain(item) for item in value]
-        return value
 
     @staticmethod
     def _clean_rules(raw_rules: Any, current_instruction: str) -> list[str]:
