@@ -5,7 +5,6 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-import dspy_domain_train.settings as settings_module
 from dspy_domain_train.settings import Settings
 from dspy_domain_train.toml import config_dir
 
@@ -13,7 +12,6 @@ BASE_TOML = """
 train_path = "data/train.json"
 dev_path = "data/dev.json"
 test_path = "data/test.json"
-prompt_path = "prompts/p0.txt"
 num_threads = 4
 seed = 42
 
@@ -49,18 +47,16 @@ class SettingsTomlTests(unittest.TestCase):
         self.env = {
             key: value for key, value in os.environ.items() if key.startswith("DSPY_")
         }
-        self.profile = settings_module._PROFILE
 
         for key in self.env:
             os.environ.pop(key, None)
-        settings_module._PROFILE = "local"
+        os.environ["DSPY_PROFILE"] = "local"
         config_dir.cache_clear()
         os.chdir(self.root)
 
     def tearDown(self) -> None:
         os.chdir(self.cwd)
         config_dir.cache_clear()
-        settings_module._PROFILE = self.profile
         for key in list(os.environ):
             if key.startswith("DSPY_"):
                 os.environ.pop(key, None)
@@ -84,7 +80,6 @@ class SettingsTomlTests(unittest.TestCase):
         self.assertEqual(settings.train_path, self.root / "data/train.json")
         self.assertEqual(settings.dev_path, self.root / "data/dev.json")
         self.assertEqual(settings.test_path, self.root / "data/test.json")
-        self.assertEqual(settings.prompt_path, self.root / "prompts/p0.txt")
 
     def test_env_overrides_toml(self) -> None:
         self.write_settings()

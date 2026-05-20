@@ -18,14 +18,10 @@ from pydantic_settings import (
 
 from .toml import ConfigPath, settings_toml_files
 
-_PROFILE = os.getenv("DSPY_PROFILE", "local")
-
-type OptimizerBackend = Literal["copro", "simba", "gepa"]
+type OptimizerBackend = Literal["copro", "simba", "gepa", "srp"]
 
 
 class AzureOpenAIModelSettings(BaseModel):
-    """Complete configuration for a single Azure OpenAI LLM."""
-
     model_config = ConfigDict(extra="forbid", validate_default=True)
 
     endpoint: AnyHttpUrl
@@ -38,8 +34,6 @@ class AzureOpenAIModelSettings(BaseModel):
 
 
 class CoproSettings(BaseModel):
-    """COPRO optimizer options."""
-
     model_config = ConfigDict(extra="forbid")
 
     breadth: int = Field(default=10, ge=2)
@@ -48,8 +42,6 @@ class CoproSettings(BaseModel):
 
 
 class SimbaSettings(BaseModel):
-    """SIMBA optimizer options."""
-
     model_config = ConfigDict(extra="forbid")
 
     max_steps: int = Field(default=6, ge=1)
@@ -58,16 +50,21 @@ class SimbaSettings(BaseModel):
 
 
 class GepaSettings(BaseModel):
-    """GEPA optimizer options."""
-
     model_config = ConfigDict(extra="forbid")
 
     auto: Literal["light", "medium", "heavy"] = "light"
 
 
-class Settings(BaseSettings):
-    """Application settings loaded from base/profile TOML with env overrides."""
+class SrpSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
+    max_iters: int = Field(default=6, ge=1)
+    patience: int = Field(default=2, ge=1)
+    max_examples: int | None = Field(default=None, ge=1)
+    max_error_cases: int = Field(default=12, ge=1)
+
+
+class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         extra="forbid",
         env_prefix="DSPY_",
@@ -83,12 +80,13 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
+        profile = os.getenv("DSPY_PROFILE", "local")
         return (
             init_settings,
             env_settings,
             TomlConfigSettingsSource(
                 settings_cls,
-                toml_file=settings_toml_files(_PROFILE),
+                toml_file=settings_toml_files(profile),
                 deep_merge=True,
             ),
             file_secret_settings,
@@ -100,19 +98,18 @@ class Settings(BaseSettings):
     train_path: ConfigPath
     dev_path: ConfigPath
     test_path: ConfigPath
-    prompt_path: ConfigPath
 
-    optimizer: OptimizerBackend = "copro"
+    optimizer: OptimizerBackend = "srp"
     num_threads: int = 4
     seed: int = 42
     max_train: int | None = None
     max_dev: int | None = None
     max_test: int | None = None
-    max_instruction_words: int = Field(default=200, ge=20)
 
-    copro: CoproSettings = CoproSettings()
-    simba: SimbaSettings = SimbaSettings()
-    gepa: GepaSettings = GepaSettings()
+    copro: CoproSettings = Field(default_factory=CoproSettings)
+    simba: SimbaSettings = Field(default_factory=SimbaSettings)
+    gepa: GepaSettings = Field(default_factory=GepaSettings)
+    srp: SrpSettings = Field(default_factory=SrpSettings)
 
     @model_validator(mode="after")
     def _check_simba_bsize(self) -> Self:
