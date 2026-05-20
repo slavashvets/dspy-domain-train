@@ -25,6 +25,12 @@ def main() -> None:
     valset = load_examples(settings.dev_path, settings.max_dev, settings.seed)
     testset = load_examples(settings.test_path, settings.max_test, settings.seed)
 
+    initial_instructions: str | None = None
+    if settings.initial_prompt_path is not None:
+        initial_instructions = settings.initial_prompt_path.read_text(
+            encoding="utf-8"
+        ).strip()
+
     run_dir = Path("runs") / datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%S")
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -38,6 +44,7 @@ def main() -> None:
                 trainset=trainset,
                 metric=domain_metric,
                 prompt_model=lm_refine,
+                initial_instructions=initial_instructions,
                 breadth=settings.copro.breadth,
                 depth=settings.copro.depth,
                 init_temperature=settings.copro.init_temperature,
@@ -48,6 +55,7 @@ def main() -> None:
                 trainset=trainset,
                 metric=domain_metric,
                 prompt_model=lm_refine,
+                initial_instructions=initial_instructions,
                 max_steps=settings.simba.max_steps,
                 bsize=settings.simba.bsize,
                 num_candidates=settings.simba.num_candidates,
@@ -60,6 +68,7 @@ def main() -> None:
                 valset=valset,
                 metric=domain_metric,
                 reflection_lm=lm_refine,
+                initial_instructions=initial_instructions,
                 gepa_auto=settings.gepa.auto,
                 num_threads=settings.num_threads,
                 log_dir=str(run_dir / "gepa"),
@@ -70,6 +79,7 @@ def main() -> None:
                 valset=valset,
                 metric=domain_metric,
                 prompt_model=lm_refine,
+                initial_instructions=initial_instructions,
                 max_iters=settings.srp.max_iters,
                 patience=settings.srp.patience,
                 max_examples=settings.srp.max_examples,
@@ -95,6 +105,28 @@ def main() -> None:
         final_instructions + "\n", encoding="utf-8"
     )
 
+    trial_logs = None
+    if settings.optimizer == "srp":
+        trial_logs = getattr(optimized, "trial_logs", None)
+        candidates = getattr(optimized, "candidate_programs", None)
+        if trial_logs is not None:
+            srp_data = {
+                "trial_logs": trial_logs,
+                "candidates": [
+                    {
+                        "iteration": c["iteration"],
+                        "score": c["score"],
+                        "accepted": c["accepted"],
+                        "rules": c["rules"],
+                        "instruction": c["instruction"],
+                    }
+                    for c in (candidates or [])
+                ],
+            }
+            (run_dir / "srp_candidates.json").write_text(
+                json.dumps(srp_data, indent=2, ensure_ascii=False) + "\n"
+            )
+
     metadata = {
         "timestamp": datetime.now(tz=UTC).isoformat(),
         "dspy_version": dspy.__version__,
@@ -104,6 +136,9 @@ def main() -> None:
         "val_size": len(valset),
         "test_size": len(testset),
         "final_instruction_words": len(final_instructions.split()),
+        "initial_prompt_path": str(settings.initial_prompt_path)
+        if settings.initial_prompt_path
+        else None,
         "settings": {
             "num_threads": settings.num_threads,
             "seed": settings.seed,
@@ -111,6 +146,8 @@ def main() -> None:
             "refine_deployment": settings.refine.deployment,
         },
     }
+    if trial_logs:
+        metadata["trial_logs"] = trial_logs
     (run_dir / "metadata.json").write_text(
         json.dumps(metadata, indent=2, ensure_ascii=False) + "\n"
     )

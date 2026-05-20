@@ -98,6 +98,7 @@ class Settings(BaseSettings):
     train_path: ConfigPath
     dev_path: ConfigPath
     test_path: ConfigPath
+    initial_prompt_path: ConfigPath | None = None
 
     optimizer: OptimizerBackend = "srp"
     num_threads: int = 4

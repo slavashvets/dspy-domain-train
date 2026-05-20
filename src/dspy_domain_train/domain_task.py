@@ -38,9 +38,14 @@ class DomainClassificationSig(dspy.Signature):
 
 
 class DomainClassifier(dspy.Module):
-    def __init__(self) -> None:
+    def __init__(self, instructions: str | None = None) -> None:
         super().__init__()
-        self.predict = dspy.Predict(DomainClassificationSig)
+        sig = (
+            DomainClassificationSig.with_instructions(instructions)
+            if instructions
+            else DomainClassificationSig
+        )
+        self.predict = dspy.Predict(sig)
 
     def forward(self, dialogue_context: str, turn: str) -> dspy.Prediction:
         return self.predict(dialogue_context=dialogue_context, turn=turn)

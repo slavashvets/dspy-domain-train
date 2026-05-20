@@ -2,6 +2,7 @@ max_train = 50
 max_dev = 30
 max_test = 30
 num_threads = 2
+initial_prompt_path = "prompts/p0.txt"
 
 [copro]
 breadth = 4

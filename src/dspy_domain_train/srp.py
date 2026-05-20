@@ -139,7 +139,7 @@ class SRP(Teleprompter):
                 stopped_reason = "no_errors"
                 break
 
-            rules = self._propose_rules(self._instruction(current), errors)
+            rules = self._propose_rules(self._instruction(current), errors, iteration)
             if not rules:
                 stopped_reason = "no_rules"
                 break
@@ -253,6 +253,7 @@ class SRP(Teleprompter):
         self,
         current_instruction: str,
         errors: list[SRPErrorCase],
+        iteration: int = 0,
     ) -> list[str]:
         context = (
             dspy.context(lm=self.prompt_model)
@@ -263,7 +264,7 @@ class SRP(Teleprompter):
             prediction = self.refiner(
                 current_instruction=current_instruction,
                 error_cases=errors,
-                config={"temperature": 1.0},
+                config={"temperature": 1.0, "rollout_id": iteration},
             )
 
         return self._clean_rules(getattr(prediction, "rules", []), current_instruction)

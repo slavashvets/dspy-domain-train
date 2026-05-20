@@ -18,11 +18,11 @@ class CanonicalGoldTests(unittest.TestCase):
         self.assertEqual(canonical_gold([]), frozenset({"none"}))
 
     def test_raises_on_invalid_label(self) -> None:
-        with self.assertRaises(ValueError, msg="Invalid gold domain labels"):
+        with self.assertRaisesRegex(ValueError, "Invalid gold domain labels"):
             canonical_gold(["invalid", "bus"])
 
     def test_raises_on_mixed_none(self) -> None:
-        with self.assertRaises(ValueError, msg="cannot mix 'none'"):
+        with self.assertRaisesRegex(ValueError, "cannot mix 'none'"):
             canonical_gold(["none", "hotel"])
 
 

@@ -52,6 +52,7 @@ def optimize_copro(
     trainset: list[dspy.Example],
     metric: Callable,
     prompt_model: dspy.LM,
+    initial_instructions: str | None = None,
     breadth: int = 10,
     depth: int = 3,
     init_temperature: float = 1.4,
@@ -59,7 +60,7 @@ def optimize_copro(
 ) -> dspy.Module:
     from .domain_task import DomainClassifier
 
-    student = DomainClassifier()
+    student = DomainClassifier(instructions=initial_instructions)
 
     optimizer = dspy.COPRO(
         prompt_model=prompt_model,
@@ -84,6 +85,7 @@ def optimize_simba(
     trainset: list[dspy.Example],
     metric: Callable,
     prompt_model: dspy.LM,
+    initial_instructions: str | None = None,
     max_steps: int = 6,
     bsize: int = 32,
     num_candidates: int = 6,
@@ -92,7 +94,7 @@ def optimize_simba(
 ) -> dspy.Module:
     from .domain_task import DomainClassifier
 
-    student = DomainClassifier()
+    student = DomainClassifier(instructions=initial_instructions)
 
     optimizer = dspy.SIMBA(
         metric=metric,
@@ -112,13 +114,14 @@ def optimize_gepa(
     valset: list[dspy.Example],
     metric: Callable,
     reflection_lm: dspy.LM,
+    initial_instructions: str | None = None,
     gepa_auto: str = "light",
     num_threads: int = 4,
     log_dir: str | None = None,
 ) -> dspy.Module:
     from .domain_task import DomainClassifier
 
-    student = DomainClassifier()
+    student = DomainClassifier(instructions=initial_instructions)
 
     optimizer = dspy.GEPA(
         metric=metric,
@@ -137,6 +140,7 @@ def optimize_srp(
     valset: list[dspy.Example],
     metric: Callable,
     prompt_model: dspy.LM,
+    initial_instructions: str | None = None,
     max_iters: int = 6,
     patience: int = 2,
     max_examples: int | None = None,
@@ -147,7 +151,7 @@ def optimize_srp(
     from .domain_task import DomainClassifier
     from .srp import SRP
 
-    student = DomainClassifier()
+    student = DomainClassifier(instructions=initial_instructions)
 
     optimizer = SRP(
         metric=metric,
