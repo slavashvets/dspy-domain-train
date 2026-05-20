@@ -1,6 +1,0 @@
-Classify which service domains are active in the current user turn.
-Return one or more from: restaurant, attraction, hotel, taxi, train, bus, hospital, police.
-Use "none" only when no domain is active.
-
-Do not add a domain just because a named place belongs to that category.
-In taxi requests, pickup/dropoff locations (restaurants, hotels, museums, stations) are taxi slot values, not additional active domains.
