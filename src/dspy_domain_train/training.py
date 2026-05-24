@@ -18,6 +18,7 @@ def _make_lm(cfg: AzureOpenAIModelSettings) -> dspy.LM:
         api_key=cfg.api_key.get_secret_value(),
         temperature=cfg.temperature,
         max_tokens=cfg.max_tokens,
+        num_retries=cfg.num_retries,
     )
 
 
@@ -38,14 +39,18 @@ def load_examples(
     raw = json.loads(path.read_text(encoding="utf-8"))
     if max_samples is not None and max_samples < len(raw):
         raw = random.Random(seed).sample(raw, max_samples)
-    return [
-        dspy.Example(
-            dialogue_context=item["dialogue_context"],
-            turn=item["turn"],
-            domains=item["domains"],
-        ).with_inputs("dialogue_context", "turn")
-        for item in raw
-    ]
+    examples: list[dspy.Example] = []
+    for item in raw:
+        fields = {
+            "dialogue_context": item["dialogue_context"],
+            "turn": item["turn"],
+            "domains": item["domains"],
+        }
+        for key in ("example_id", "hard_category", "source_split", "source_index"):
+            if key in item:
+                fields[key] = item[key]
+        examples.append(dspy.Example(**fields).with_inputs("dialogue_context", "turn"))
+    return examples
 
 
 def optimize_copro(
@@ -145,6 +150,9 @@ def optimize_srp(
     patience: int = 2,
     max_examples: int | None = None,
     max_error_cases: int = 12,
+    num_candidates: int = 5,
+    candidate_retries: int = 1,
+    proposal_temperature: float = 1.0,
     num_threads: int = 4,
     seed: int = 0,
 ) -> dspy.Module:
@@ -160,6 +168,9 @@ def optimize_srp(
         patience=patience,
         max_examples=max_examples,
         max_error_cases=max_error_cases,
+        num_candidates=num_candidates,
+        candidate_retries=candidate_retries,
+        proposal_temperature=proposal_temperature,
         num_threads=num_threads,
         seed=seed,
         display_progress=True,

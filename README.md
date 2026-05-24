@@ -4,9 +4,9 @@ Multilabel domain classifier optimized with [DSPy](https://dspy.ai/) and
 Azure OpenAI.
 
 The project includes a custom **SRP (Self-Reflective Prompting)** optimizer
-that iteratively appends concise rules to a predictor's instruction by
-analyzing error cases. It also supports DSPy's built-in GEPA for evolutionary
-instruction optimization.
+that iteratively proposes complete instruction candidates from structured error
+feedback. It also supports DSPy's built-in GEPA for evolutionary instruction
+optimization.
 
 ## Requirements
 
@@ -82,12 +82,13 @@ Allowed labels are `restaurant`, `attraction`, `hotel`, `taxi`, `train`, `bus`,
 
 SRP (Self-Reflective Prompting) is a custom DSPy `Teleprompter` that:
 
-1. Evaluates the current program on a working set
-2. Collects error cases (inputs, gold, prediction, feedback)
-3. Uses a refiner LM to propose 1-3 concise rules addressing those errors
-4. Appends rules to the predictor instruction
-5. Accepts the candidate if score improves, otherwise increments patience counter
-6. Stops on perfect score, patience exhaustion, or max iterations
+1. Evaluates the current program on a validation set when provided
+2. Collects feedback errors from the train/work set
+3. Builds clustered missing/extra-label feedback with secondary metrics
+4. Uses a refiner LM to propose mode-diverse complete instruction candidates
+5. Accepts only strict validation-score improvements
+6. Stores equal-score, different-error candidates in a frontier for inspection
+7. Stops on perfect score, patience exhaustion, or max iterations
 
 ```python
 from dspy_domain_train.srp import SRP
@@ -104,5 +105,5 @@ optimized = optimizer.compile(student, trainset=trainset, valset=valset)
 ```
 
 The returned module carries `candidate_programs` (chronological list with
-iteration, score, rules, accepted) and `trial_logs` (best_score,
-stopped_reason).
+iteration, rank, score, metrics, error fingerprint, and acceptance flag),
+`frontier_programs`, and `trial_logs` (best_score, stopped_reason).

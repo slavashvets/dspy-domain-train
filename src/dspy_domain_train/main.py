@@ -1,11 +1,13 @@
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import dspy
 
-from .domain_task import domain_metric
+from .domain_task import DomainClassifier, domain_metric
 from .settings import get_settings
+from .srp import SRP
 from .training import (
     configure_lm,
     get_instructions,
@@ -15,6 +17,55 @@ from .training import (
     optimize_simba,
     optimize_srp,
 )
+
+
+def _evaluate_program(
+    program: dspy.Module,
+    evalset: list[dspy.Example],
+    *,
+    num_threads: int,
+    display_progress: bool,
+) -> tuple[Any, dict[str, Any]]:
+    evaluator = dspy.Evaluate(
+        devset=evalset,
+        metric=domain_metric,
+        num_threads=num_threads,
+        display_progress=display_progress,
+        max_errors=1,
+    )
+    result = evaluator(program)
+    metrics = SRP._result_metrics(result.results)
+    return result, {
+        "score": result.score,
+        "metrics": metrics,
+        "by_category": _category_metrics(result.results),
+    }
+
+
+def _category_metrics(results: list[tuple[dspy.Example, dspy.Prediction, Any]]) -> dict:
+    grouped: dict[str, list[tuple[dspy.Example, dspy.Prediction, Any]]] = {}
+    for row in results:
+        category = getattr(row[0], "hard_category", None)
+        if category is None:
+            continue
+        grouped.setdefault(str(category), []).append(row)
+
+    return {
+        category: {
+            "total": len(rows),
+            "metrics": SRP._result_metrics(rows),
+        }
+        for category, rows in sorted(grouped.items())
+    }
+
+
+def _print_eval_summary(label: str, summary: dict[str, Any]) -> None:
+    metrics = summary["metrics"]
+    print(
+        f"{label}: {summary['score']:.1f}% "
+        f"(macro_f1={metrics['macro_f1']:.3f}, "
+        f"jaccard={metrics['mean_jaccard']:.3f})"
+    )
 
 
 def main() -> None:
@@ -37,6 +88,29 @@ def main() -> None:
     print(f"Train: {len(trainset)} | Val: {len(valset)} | Test: {len(testset)}")
     print(f"Optimizer: {settings.optimizer}")
     print(f"Log dir: {run_dir}")
+
+    eval_report: dict[str, Any] = {}
+    if settings.compare_baseline:
+        print("\nEvaluating baseline...")
+        baseline = DomainClassifier(instructions=initial_instructions)
+        _, baseline_val = _evaluate_program(
+            baseline,
+            valset,
+            num_threads=settings.num_threads,
+            display_progress=False,
+        )
+        _, baseline_test = _evaluate_program(
+            baseline,
+            testset,
+            num_threads=settings.num_threads,
+            display_progress=False,
+        )
+        eval_report["baseline"] = {
+            "val": baseline_val,
+            "test": baseline_test,
+        }
+        _print_eval_summary("Baseline val", baseline_val)
+        _print_eval_summary("Baseline test", baseline_test)
 
     match settings.optimizer:
         case "copro":
@@ -84,17 +158,40 @@ def main() -> None:
                 patience=settings.srp.patience,
                 max_examples=settings.srp.max_examples,
                 max_error_cases=settings.srp.max_error_cases,
+                num_candidates=settings.srp.num_candidates,
+                candidate_retries=settings.srp.candidate_retries,
+                proposal_temperature=settings.srp.proposal_temperature,
                 num_threads=settings.num_threads,
                 seed=settings.seed,
             )
 
-    evaluator = dspy.Evaluate(
-        devset=testset,
-        metric=domain_metric,
-        num_threads=settings.num_threads,
-        display_progress=True,
-    )
-    result = evaluator(optimized)
+    if settings.compare_baseline:
+        print("\nEvaluating optimized program...")
+        _, optimized_val = _evaluate_program(
+            optimized,
+            valset,
+            num_threads=settings.num_threads,
+            display_progress=False,
+        )
+        result, optimized_test = _evaluate_program(
+            optimized,
+            testset,
+            num_threads=settings.num_threads,
+            display_progress=True,
+        )
+        eval_report["optimized"] = {
+            "val": optimized_val,
+            "test": optimized_test,
+        }
+        _print_eval_summary("Optimized val", optimized_val)
+        _print_eval_summary("Optimized test", optimized_test)
+    else:
+        result, optimized_test = _evaluate_program(
+            optimized,
+            testset,
+            num_threads=settings.num_threads,
+            display_progress=True,
+        )
     print(f"\nTest score: {result.score:.1f}%")
 
     final_instructions = get_instructions(optimized)
@@ -109,18 +206,36 @@ def main() -> None:
     if settings.optimizer == "srp":
         trial_logs = getattr(optimized, "trial_logs", None)
         candidates = getattr(optimized, "candidate_programs", None)
+        frontier = getattr(optimized, "frontier_programs", None)
         if trial_logs is not None:
             srp_data = {
                 "trial_logs": trial_logs,
                 "candidates": [
                     {
                         "iteration": c["iteration"],
+                        "rank": c["rank"],
                         "score": c["score"],
                         "accepted": c["accepted"],
-                        "rules": c["rules"],
+                        "instruction_words": c.get("instruction_words"),
+                        "metrics": c.get("metrics", {}),
+                        "error_fingerprint": c.get("error_fingerprint", []),
+                        "error_ids": c.get("error_ids", []),
                         "instruction": c["instruction"],
                     }
                     for c in (candidates or [])
+                ],
+                "frontier": [
+                    {
+                        "iteration": c["iteration"],
+                        "rank": c["rank"],
+                        "score": c["score"],
+                        "instruction_words": c.get("instruction_words"),
+                        "metrics": c.get("metrics", {}),
+                        "error_fingerprint": c.get("error_fingerprint", []),
+                        "error_ids": c.get("error_ids", []),
+                        "instruction": c["instruction"],
+                    }
+                    for c in (frontier or [])
                 ],
             }
             (run_dir / "srp_candidates.json").write_text(
@@ -142,10 +257,19 @@ def main() -> None:
         "settings": {
             "num_threads": settings.num_threads,
             "seed": settings.seed,
+            "compare_baseline": settings.compare_baseline,
             "eval_deployment": settings.eval.deployment,
             "refine_deployment": settings.refine.deployment,
+            "srp_num_candidates": settings.srp.num_candidates,
+            "srp_candidate_retries": settings.srp.candidate_retries,
         },
     }
+    if eval_report:
+        eval_report["optimized_test"] = optimized_test
+        (run_dir / "eval_report.json").write_text(
+            json.dumps(eval_report, indent=2, ensure_ascii=False) + "\n"
+        )
+        metadata["eval_report_path"] = str(run_dir / "eval_report.json")
     if trial_logs:
         metadata["trial_logs"] = trial_logs
     (run_dir / "metadata.json").write_text(

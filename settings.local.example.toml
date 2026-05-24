@@ -8,6 +8,7 @@ api_version = "v1"
 deployment = "gpt-4-1"
 model_type = "chat"
 temperature = 0.0
+num_retries = 8
 # max_tokens = 4096
 
 [refine]
@@ -18,3 +19,4 @@ deployment = "gpt-5"
 model_type = "chat"
 temperature = 1.0
 max_tokens = 16000
+num_retries = 8

@@ -1,0 +1,18 @@
+train_path = "data/hard_train.json"
+dev_path = "data/hard_dev.json"
+test_path = "data/hard_test.json"
+
+optimizer = "srp"
+num_threads = 1
+seed = 42
+compare_baseline = true
+initial_prompt_path = "prompts/p0.txt"
+
+[srp]
+max_iters = 3
+patience = 2
+max_examples = 72
+max_error_cases = 24
+num_candidates = 8
+candidate_retries = 1
+proposal_temperature = 1.0

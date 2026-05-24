@@ -74,7 +74,9 @@ class SettingsTomlTests(unittest.TestCase):
 
         self.assertEqual(settings.gepa.auto, "light")
         self.assertEqual(settings.num_threads, 4)
+        self.assertFalse(settings.compare_baseline)
         self.assertEqual(settings.eval.deployment, "eval-deployment")
+        self.assertEqual(settings.eval.num_retries, 8)
         self.assertEqual(settings.refine.max_tokens, 16000)
         self.assertEqual(settings.eval.api_key.get_secret_value(), "eval-secret")
         self.assertEqual(settings.train_path, self.root / "data/train.json")

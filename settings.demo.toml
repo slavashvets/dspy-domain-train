@@ -1,5 +1,5 @@
 max_train = 50
-max_dev = 30
+max_dev = 100
 max_test = 30
 num_threads = 2
 initial_prompt_path = "prompts/p0.txt"
@@ -17,3 +17,6 @@ num_candidates = 4
 max_iters = 3
 patience = 2
 max_error_cases = 8
+num_candidates = 4
+candidate_retries = 1
+proposal_temperature = 1.0
